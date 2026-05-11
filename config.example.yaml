@@ -1,0 +1,144 @@
+# Configuration for the OpsInTech application
+#
+# ============================================================================
+# Config Version (used to detect outdated config files)
+# ============================================================================
+# Bump this number when the config schema changes.
+# Run `make config-upgrade` to merge new fields into your local config.yaml.
+config_version: 1
+
+# ============================================================================
+# Log Level
+# ============================================================================
+# Logging level for opsintech modules (debug/info/warning/error)
+log_level: info
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+# SQLite (default) — no extra services needed, db-init creates the file
+database:
+  type: sqlite
+  url: sqlite+aiosqlite:///.opsintech/tenant.db
+  echo: false
+  auth:
+    type: sqlite
+    url: sqlite+aiosqlite:///.opsintech/auth.db
+
+# PostgreSQL (for production) — uncomment and set your credentials:
+# database:
+#   type: postgres
+#   url: postgresql+asyncpg://user:password@host:5432/tenant_db
+#   auth:
+#     type: postgres
+#     url: postgresql+asyncpg://user:password@host:5432/auth_db
+
+# ============================================================================
+# Sandbox Configuration
+# ============================================================================
+# Choose between local sandbox (direct execution) or Docker-based AIO sandbox
+
+# Option 1: Local Sandbox (Default)
+# Executes commands directly on the host machine
+sandbox:
+  use: LocalSandboxProvider
+
+# Option 2: Container-based AIO Sandbox
+# Executes commands in isolated containers (Docker)
+# sandbox:
+#   use: AioSandboxProvider
+#   image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
+#   port: 8080
+#   container_prefix: opsintech-sandbox
+#   # Optional: Maximum number of concurrent sandbox containers (default: 3)
+#   replicas: 3
+
+# Option 3: Provisioner-managed AIO Sandbox 
+# Each sandbox_id gets a dedicated Pod in k3s, managed by the provisioner.
+# Recommended for production or advanced users who want better isolation and scalability.
+# sandbox:
+#   use: AioSandboxProvider
+#   provisioner_url: http://provisioner:8002
+
+# ============================================================================
+# Title Generation Configuration
+# ============================================================================
+# Automatic conversation title generation settings
+
+title:
+  enabled: true
+  max_words: 6
+  max_chars: 60
+  model_name: null
+
+# ============================================================================
+# Summarization Configuration
+# ============================================================================
+# Automatically summarize conversation history when token limits are approached
+# This helps maintain context in long conversations without exceeding model limits
+
+summarization:
+  enabled: true
+
+  # Model to use for summarization (null = use default model)
+  model_name: null
+
+  trigger:
+    - type: tokens
+      value: 15564
+    # - type: messages
+    #   value: 50
+    # - type: fraction
+    #   value: 0.8
+
+  keep:
+    type: messages
+    value: 10
+    # type: tokens
+    # value: 3000
+    # type: fraction
+    # value: 0.3
+
+  trim_tokens_to_summarize: 15564
+  summary_prompt: null
+
+# ============================================================================
+# Memory Configuration
+# ============================================================================
+# Global memory mechanism
+# Stores user context and conversation history for personalized responses
+
+memory:
+  enabled: true
+  storage_path: memory.json
+  debounce_seconds: 30
+  model_name: null
+  max_facts: 100
+  fact_confidence_threshold: 0.7
+  injection_enabled: true
+  max_injection_tokens: 2000
+
+# ============================================================================
+# Checkpointer Configuration
+# ============================================================================
+# Configure state persistence for the embedded OpsInTechClient.
+# The LangGraph Server manages its own state persistence separately
+# via the server infrastructure (this setting does not affect it).
+#
+# Supported types:
+#   memory   - In-process only. State is lost when the process exits. (default)
+#   sqlite   - File-based SQLite persistence. Survives restarts.
+#   postgres - PostgreSQL persistence. Suitable for multi-process deployments.
+
+checkpointer:
+  type: sqlite
+  connection_string: .opsintech/checkpoints.db
+
+# In-memory (default when omitted — no persistence):
+# checkpointer:
+#   type: memory
+
+# PostgreSQL (multi-process, production):
+# checkpointer:
+#   type: postgres
+#   connection_string: postgresql://user:password@localhost:5432/opsintech

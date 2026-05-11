@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <defs>
+    <!-- Seamless Gradient Loop for the 4 facets -->
+    <!-- Top Bar: Dark Blue to Cyan -->
+    <linearGradient id="grad-top" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    
+    <!-- Right Bar: Cyan to Royal Blue -->
+    <linearGradient id="grad-right" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    
+    <!-- Bottom Bar: Purple to Royal Blue (Right to Left) -->
+    <linearGradient id="grad-bottom" x1="100%" y1="0%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    
+    <!-- Left Bar: Purple to Dark Blue (Bottom to Top) -->
+    <linearGradient id="grad-left" x1="0%" y1="100%" x2="0%" y2="0%">
+      <stop offset="0%" stop-color="#7C3AED" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+    
+    <!-- Core: Energetic Cyan/Blue for the "Intelligence" center -->
+    <linearGradient id="grad-core" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#3B82F6" />
+    </linearGradient>
+    
+    <!-- Premium UI shadow -->
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.15" />
+    </filter>
+    
+    <!-- Subtle structure glow for the core -->
+    <filter id="core-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Transparent padding -->
+  <rect width="400" height="400" fill="transparent" />
+
+  <!-- Main Corporate Emblem -->
+  <!-- We rotate 45 degrees to turn the segmented square into a dynamic diamond shield -->
+  <g transform="rotate(45 200 200)" filter="url(#shadow)">
+    <!-- Top Block (Ops) -->
+    <rect x="100" y="100" width="140" height="48" rx="14" fill="url(#grad-top)" />
+    <!-- Right Block (Data) -->
+    <rect x="252" y="100" width="48" height="140" rx="14" fill="url(#grad-right)" />
+    <!-- Bottom Block (AI) -->
+    <rect x="160" y="252" width="140" height="48" rx="14" fill="url(#grad-bottom)" />
+    <!-- Left Block (Flow) -->
+    <rect x="100" y="160" width="48" height="140" rx="14" fill="url(#grad-left)" />
+    
+    <!-- Central Intelligence Core -->
+    <!-- Rotating back -45deg keeps the core perfectly upright and solid, 
+         creating a beautiful optical contrast between the diamond frame and the square core -->
+    <rect x="172" y="172" width="56" height="56" rx="12" fill="url(#grad-core)" filter="url(#core-glow)" transform="rotate(-45 200 200)" />
+  </g>
+</svg>

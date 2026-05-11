@@ -1,0 +1,110 @@
+"use client";
+
+import {
+  BellIcon,
+  // BotIcon,
+  LayoutDashboardIcon,
+  PlayCircleIcon,
+  Settings2Icon,
+  ShieldCheckIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+
+import { useActiveAnnouncements } from "@/core/announcements";
+import { useSession } from "@/core/auth/hooks";
+import { useI18n } from "@/core/i18n/hooks";
+import { canAccessAdminPage } from "@/core/permissions/roles";
+import { cn } from "@/lib/utils";
+
+export function WorkspaceNavChatList() {
+  const { data: session } = useSession();
+  const pathname = usePathname();
+  const { t } = useI18n();
+  const isAdmin = canAccessAdminPage(session?.user?.role);
+  const { announcements } = useActiveAnnouncements({ limit: 20 });
+
+  const unreadAnnouncements = announcements.filter((item) => !item.read_state?.is_read);
+  const unreadCount = unreadAnnouncements.length;
+
+  const links = [
+    {
+      name: t.sidebarNav.overview,
+      href: "/workspace/overview",
+      icon: LayoutDashboardIcon,
+      active: pathname.startsWith("/workspace/overview"),
+    },
+    {
+      name: t.sidebarNav.smartWorkbench,
+      href: "/workspace/chats/new",
+      icon: PlayCircleIcon,
+      active: pathname.startsWith("/workspace/chats"),
+    },
+    // {
+    //   name: t.sidebarNav.agents,
+    //   href: "/workspace/agents",
+    //   icon: BotIcon,
+    //   active: pathname.startsWith("/workspace/agents"),
+    // },
+    {
+      name: t.sidebarNav.announcements,
+      href: "/workspace/announcements",
+      icon: BellIcon,
+      active: pathname.startsWith("/workspace/announcements"),
+    },
+    ...(isAdmin
+      ? [
+          {
+            name: t.sidebarNav.auditGovernance,
+            href: "/admin",
+            icon: ShieldCheckIcon,
+            active: pathname.startsWith("/admin"),
+          },
+          {
+            name: t.sidebarNav.systemSettings,
+            href: "/admin/security",
+            icon: Settings2Icon,
+            active: pathname.startsWith("/admin/security"),
+          },
+        ]
+      : []),
+  ];
+
+  return (
+    <nav className="flex w-full flex-col gap-1 px-2 py-2">
+      {links.map((link) => {
+        const Icon = link.icon;
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            className={cn(
+              "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-2 overflow-hidden",
+              link.active
+                ? "bg-background text-foreground shadow-sm ring-1 ring-black/5 dark:ring-white/10 font-medium scale-[1.02]"
+                : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5",
+            )}
+            title={link.name}
+          >
+            {link.active && (
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-primary rounded-r-full" />
+            )}
+            <Icon 
+              className={cn(
+                "size-[18px] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                link.active && "text-primary scale-110"
+              )} 
+              strokeWidth={link.active ? 2.5 : 2} 
+            />
+            <span className="truncate group-data-[collapsible=icon]:hidden">{link.name}</span>
+            {link.href === "/workspace/announcements" && unreadCount > 0 && (
+              <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden animate-in fade-in zoom-in">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

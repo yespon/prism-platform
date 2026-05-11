@@ -1,0 +1,198 @@
+# OpsinTech Platform - Docker Compose
+#
+# Quick start:
+#   1. cp config.example.yaml config.yaml 
+#   2. docker compose up -d
+#   3. Open http://localhost:2026
+#
+# For PostgreSQL instead of SQLite, add --profile postgres:
+#   docker compose --profile postgres up -d
+#
+# Services:
+#   nginx      - Reverse proxy on port 2026
+#   frontend   - Next.js (port 3000 internal)
+#   gateway    - FastAPI Gateway (port 8001 internal)
+#   langgraph  - LangGraph agent runtime (port 2024 internal)
+#   db-init    - Alembic migration runner (run once then exits)
+#   postgres   - (optional) PostgreSQL 16, profile: postgres
+
+x-common-env: &common-env
+  OPSINTECH_HOME: /app/backend/.opsintech
+  OPSINTECH_HOST_BASE_DIR: ${OPSINTECH_HOME:-./backend/.opsintech}
+  OPSINTECH_HOST_SKILLS_PATH: ${PWD:-.}/skills
+  OPSINTECH_SANDBOX_HOST: host.docker.internal
+  CI: "true"
+
+x-common-build: &common-build
+  context: .
+  dockerfile: backend/Dockerfile
+
+services:
+  db-init:
+    build:
+      <<: *common-build
+    container_name: opsintech-db-init
+    command: sh -c "cd backend && PYTHONPATH=. uv run alembic upgrade head"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - ${OPSINTECH_HOME:-./backend/.opsintech}:/app/backend/.opsintech
+      - ./skills:/app/skills:ro
+    working_dir: /app
+    environment:
+      <<: *common-env
+    networks:
+      - opsintech
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: opsintech-postgres
+    profiles:
+      - postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opsintech}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opsintech}
+      POSTGRES_DB: ${POSTGRES_DB:-opsintech}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init-databases.sql:/docker-entrypoint-initdb.d/01-init-databases.sql:ro
+    networks:
+      - opsintech
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opsintech} -d ${POSTGRES_DB:-opsintech}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  nginx:
+    image: nginx:alpine
+    container_name: opsintech-nginx
+    ports:
+      - "${PORT:-2026}:2026"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+      langgraph:
+        condition: service_healthy
+    networks:
+      - opsintech
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: prod
+    container_name: opsintech-frontend
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ${OPSINTECH_HOME:-./backend/.opsintech}:/app/backend/.opsintech
+    environment:
+      SERVER_BACKEND_URL: http://gateway:8001
+    networks:
+      - opsintech
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  gateway:
+    build:
+      <<: *common-build
+    container_name: opsintech-gateway
+    command: sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 --workers 2"
+    volumes:
+      - ./config.yaml:/app/backend/config.yaml:ro
+      - ${OPSINTECH_HOME:-./backend/.opsintech}:/app/backend/.opsintech
+      - ./skills:/app/skills:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /app
+    environment:
+      <<: *common-env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - opsintech
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+  langgraph:
+    build:
+      <<: *common-build
+    container_name: opsintech-langgraph
+    command: sh -c "cd /app/backend && uv run langgraph dev --no-browser --allow-blocking --no-reload --host 0.0.0.0 --port 2024"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ${OPSINTECH_HOME:-./backend/.opsintech}:/app/backend/.opsintech
+      - ./skills:/app/skills:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      <<: *common-env
+      OPSINTECH_CONFIG_PATH: /app/config.yaml
+      LANGCHAIN_TRACING_V2: ${LANGCHAIN_TRACING_V2:-false}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - opsintech
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2024/ok"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+
+networks:
+  opsintech:
+    driver: bridge
+
+volumes:
+  postgres-data:
