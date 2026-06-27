@@ -34,6 +34,7 @@ import {
   useChatHeader,
   useThreadChat,
 } from "@/components/workspace/chats";
+import { ContextWarningBanner } from "@/components/workspace/context-warning-banner";
 import { InputBox } from "@/components/workspace/input-box";
 import { MessageList } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
@@ -62,6 +63,7 @@ import {
   selectPreferredReferencesForAddedIds,
 } from "./attachment-selection";
 import { ThreadAttachmentsPanel } from "./thread-attachments-panel";
+import { useTerminalContext } from "@/app/workspace/terminal/context";
 
 interface ChatThreadContentProps {
   threadId: string;
@@ -80,6 +82,7 @@ export function ChatThreadContent({ threadId, context, onContextChange }: ChatTh
   const headerCtx = useChatHeader();
   const { showNotification } = useNotification();
   const [todosHidden, setTodosHidden] = useState(false);
+  const terminalContext = useTerminalContext();
 
   useEffect(() => {
     setMounted(true);
@@ -192,6 +195,14 @@ export function ChatThreadContent({ threadId, context, onContextChange }: ChatTh
     },
     [selectedAttachmentIds, sendMessage, threadAttachments, effectiveThreadId],
   );
+
+  useEffect(() => {
+    if (terminalContext?.sendMessageRef) {
+      terminalContext.sendMessageRef.current = (text: string) => {
+        handleSubmit({ text, files: [] });
+      };
+    }
+  }, [terminalContext, handleSubmit]);
 
   const handleRetryHumanMessage = useCallback(
     (message: Message) => {
@@ -328,7 +339,7 @@ export function ChatThreadContent({ threadId, context, onContextChange }: ChatTh
                 <div className="hidden bg-border h-4 w-px lg:block" />
               </div>
               <div className="flex items-center gap-1.5 shrink-0 pl-3 pointer-events-auto opacity-70 hover:opacity-100 transition-opacity">
-                <TokenUsageIndicator messages={thread.messages} />
+                <TokenUsageIndicator messages={thread.messages} modelMaxTokens={context.model_max_input_tokens as number | undefined} />
                 <ArtifactTrigger threadId={effectiveThreadId} />
                 <Sheet open={headerCtx.historyOpen} onOpenChange={headerCtx.setHistoryOpen}>
                   <SheetTrigger asChild>
@@ -470,6 +481,15 @@ export function ChatThreadContent({ threadId, context, onContextChange }: ChatTh
                     </div>
                   </div>
                 )}
+                <ContextWarningBanner
+                  messages={thread.messages}
+                  modelMaxTokens={context.model_max_input_tokens as number | undefined}
+                  onNewChat={() => {
+                    void handleStop();
+                    openThread("new");
+                  }}
+                  className="mb-3"
+                />
                 <MessageList
                   className={cn("size-full min-h-0 flex-1 bg-transparent")}
                   threadId={effectiveThreadId}

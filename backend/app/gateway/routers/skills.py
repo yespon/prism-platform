@@ -102,6 +102,7 @@ class TenantSkillPatchRequest(BaseModel):
 class GenerateInstructionsRequest(BaseModel):
     """Request model for AI-generated instructions."""
     prompt: str = Field(..., description="Natural language description of desired skill behavior")
+    model_name: str | None = Field(None, description="Optional model name to use for generation")
 
 
 class GenerateInstructionsResponse(BaseModel):
@@ -112,6 +113,8 @@ class GenerateInstructionsResponse(BaseModel):
 class SkillDetailResponse(SkillResponse):
     """Extended response for skill detail view."""
     references: dict[str, str] | None = Field(None, description="Reference documents (Tier 3)")
+    scope: str = Field(..., description="Scope of the skill (global, tenant, personal)")
+    managed_by_current_user: bool = Field(..., description="Whether current user can manage this skill")
 
 
 class ToolCallSummary(BaseModel):
@@ -240,7 +243,12 @@ def _read_skill_file_payload(skill_dir: Path) -> tuple[str | None, str | None]:
         return None, None
     frontmatter, instructions = _split_skill_markdown(skill_file.read_text(encoding="utf-8"))
     description = frontmatter.get("description")
-    description_text = str(description).strip() if isinstance(description, str) and description.strip() else None
+    if description is not None:
+        description_text = str(description).strip()
+        if not description_text:
+            description_text = None
+    else:
+        description_text = None
     return description_text, instructions or None
 
 
@@ -326,13 +334,19 @@ def _build_skill_response(
 ) -> SkillResponse:
     resolved = next((s for s in load_skills(enabled_only=False) if s.name == row_name), None)
     skill_dir = _resolve_skill_runtime_dir(tenant_id, row_name, install_dir, relative_path)
-    frontmatter, instructions = _read_skill_file_payload(skill_dir)
-    file_description = frontmatter.get("description") or ""
-    if isinstance(file_description, str) and file_description.strip():
-        pass
+    skill_file = skill_dir / "SKILL.md"
+    file_description: str | None = None
+    if skill_file.exists():
+        raw = skill_file.read_text(encoding="utf-8")
+        fm, instructions = _split_skill_markdown(raw)
+        # _read_skill_file_payload safely casts description to str
+        file_description, _ = _read_skill_file_payload(skill_dir)
     else:
-        file_description = None
+        fm = {}
+        instructions = ""
+
     settings = settings or {}
+
     return SkillResponse(
         name=row_name,
         description=(resolved.description if resolved is not None else file_description) or "",
@@ -343,11 +357,11 @@ def _build_skill_response(
         prompt_template=settings.get("prompt_template"),
         strategy=settings.get("strategy"),
         instructions=instructions,
-        created_by=frontmatter.get("created_by"),
-        version=int(frontmatter.get("version", 1)),
-        changelog=frontmatter.get("changelog"),
-        usage_count=int(frontmatter.get("usage_count", 0)),
-        references=frontmatter.get("references"),
+        created_by=fm.get("created_by"),
+        version=int(fm.get("version", 1)),
+        changelog=fm.get("changelog"),
+        usage_count=int(fm.get("usage_count", 0)),
+        references=fm.get("references"),
     )
 
 
@@ -692,7 +706,12 @@ async def patch_personal_skill(skill_name: str, request: TenantSkillPatchRequest
         getattr(row, "install_dir", None),
         getattr(row, "relative_path", None),
     )
-    frontmatter, current_instructions = _read_skill_file_payload(skill_dir)
+    skill_file = skill_dir / "SKILL.md"
+    if skill_file.exists():
+        frontmatter, current_instructions = _split_skill_markdown(skill_file.read_text(encoding="utf-8"))
+    else:
+        frontmatter = {}
+        current_instructions = ""
 
     settings = await update_tenant_personal_skill_settings(
         tenant_id,
@@ -967,43 +986,60 @@ async def install_skill(request: SkillInstallRequest, api_request: Request) -> S
 
 
 @router.get(
-    "/tenants/skills/{skill_name}/detail",
+    "/skills/{skill_name}/detail",
     response_model=SkillDetailResponse,
-    summary="Get Tenant Skill Detail",
-    description="Return full detail for a tenant shared skill including instructions and metadata.",
+    summary="Get Skill Detail",
+    description="Return full detail for any available skill (global, tenant, or personal).",
 )
-async def get_tenant_skill_detail(skill_name: str, request: Request) -> SkillDetailResponse:
+async def get_skill_detail(skill_name: str, request: Request) -> SkillDetailResponse:
     tenant_id = require_tenant_context(request)
-    rows = await list_tenant_shared_skills(tenant_id)
-    row = next((r for r in rows if r.name == skill_name), None)
-    if row is None:
-        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
-
-    settings_by_name = await get_tenant_shared_skill_settings(tenant_id)
-    settings = settings_by_name.get(row.name) or {}
-    skill_dir = _resolve_skill_runtime_dir(
-        tenant_id, row.name,
-        getattr(row, "install_dir", None),
-        getattr(row, "relative_path", None),
+    user_id = request.state.user_id
+    
+    rows = await get_available_skills(
+        user_id,
+        tenant_id,
+        is_tenant_admin=_is_tenant_admin(request),
+        is_platform_admin=_is_platform_admin(request),
     )
-    frontmatter, instructions = _read_skill_file_payload(skill_dir)
-    resolved = next((s for s in load_skills(enabled_only=False) if s.name == row.name), None)
+    
+    row = next((r for r in rows if r.get("name") == skill_name), None)
+    if row is None:
+        raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found or you don't have access")
+
+    skill_dir = _resolve_skill_runtime_dir(
+        tenant_id, 
+        skill_name,
+        row.get("install_dir"),
+        row.get("relative_path"),
+    )
+    skill_file = skill_dir / "SKILL.md"
+    file_description: str | None = None
+    if skill_file.exists():
+        raw = skill_file.read_text(encoding="utf-8")
+        fm, instructions = _split_skill_markdown(raw)
+        # _read_skill_file_payload safely casts description to str
+        file_description, _ = _read_skill_file_payload(skill_dir)
+    else:
+        fm = {}
+        instructions = ""
 
     return SkillDetailResponse(
-        name=row.name,
-        description=(resolved.description if resolved is not None else frontmatter.get("description")) or "",
-        license=resolved.license if resolved is not None else None,
-        category=row.category,
-        enabled=row.enabled,
-        bound_tools=settings.get("bound_tools") or [],
-        prompt_template=settings.get("prompt_template"),
-        strategy=settings.get("strategy"),
+        name=row.get("name") or skill_name,
+        description=row.get("description") or file_description or "",
+        license=row.get("license"),
+        category=row.get("category"),
+        enabled=row.get("enabled", True),
+        bound_tools=row.get("bound_tools") or [],
+        prompt_template=row.get("prompt_template"),
+        strategy=row.get("strategy"),
         instructions=instructions,
-        created_by=frontmatter.get("created_by"),
-        version=int(frontmatter.get("version", 1)),
-        changelog=frontmatter.get("changelog"),
-        usage_count=int(frontmatter.get("usage_count", 0)),
-        references=frontmatter.get("references"),
+        created_by=fm.get("created_by"),
+        version=int(fm.get("version", 1)),
+        changelog=fm.get("changelog"),
+        usage_count=int(fm.get("usage_count", 0)),
+        references=fm.get("references"),
+        scope=row.get("scope", "global"),
+        managed_by_current_user=row.get("managed_by_current_user", False),
     )
 
 
@@ -1019,35 +1055,29 @@ async def generate_skill_instructions(
 ) -> GenerateInstructionsResponse:
     require_tenant_context(request)
     try:
-        from app.agent.agent_factory import make_lead_agent
+        from deerflow.models.factory import create_chat_model
+        from langchain_core.messages import SystemMessage, HumanMessage
 
-        agent = await make_lead_agent(request)
-        gen_prompt = f"""You are a skill instruction writer for an AI agent platform focused on operations (SRE/DevOps).
-
-A user wants to create a new Skill. They described what they want the agent to be able to do:
+        llm = create_chat_model(body.model_name or "gpt-4o")
+        
+        sys_msg = SystemMessage(content="You are an expert AI prompt engineer and Skill Instruction Writer for an AI Agent platform.")
+        human_msg = HumanMessage(content=f"""A user wants to create a new Agent Skill. They described what they want the agent to be able to do:
 
 "{body.prompt}"
 
 Please write structured, professional Skill instructions in Chinese (Simplified).
 Follow these guidelines:
 1. Use clear Markdown headings (##, ###)
-2. Include a diagnostic workflow with numbered steps
-3. Include common failure patterns and how to identify them
-4. Include recommended commands/tools to use at each step
-5. Include what NOT to do (constraints)
-6. Keep instructions between 500-1500 characters
+2. Define the goal clearly and outline a step-by-step workflow for the agent to follow
+3. Include any required conditions, constraints, or what NOT to do
+4. If applicable, suggest which tools or capabilities the agent should leverage at each step
+5. Keep instructions between 300-1500 characters
+6. The instructions are for the Agent to read and execute, so use an instructional tone ("You should...")
 
-Output ONLY the instructions text, no preamble or explanation."""
+Output ONLY the instructions text, no preamble or explanation.""")
 
-        result = await agent.ainvoke({"messages": [{"role": "human", "content": gen_prompt}]})
-        output_text = ""
-        if hasattr(result, "get") and isinstance(result.get("messages"), list):
-            for msg in result["messages"]:
-                if hasattr(msg, "content") and isinstance(msg.content, str):
-                    output_text = msg.content
-
-        if not output_text:
-            output_text = str(result)
+        result = await llm.ainvoke([sys_msg, human_msg])
+        output_text = result.content if hasattr(result, "content") else str(result)
 
         return GenerateInstructionsResponse(instructions=output_text.strip())
     except Exception as e:
@@ -1067,11 +1097,17 @@ async def summarize_diagnosis(
 ) -> SummarizeDiagnosisResponse:
     require_tenant_context(request)
     try:
-        import os
-        from langgraph_sdk import get_client
+        import json as _json
+        from deerflow.models import create_chat_model
+        from deerflow.database.user_config_store import load_enabled_tenant_model_names
 
-        langgraph_url = os.getenv("LANGGRAPH_API_URL", "http://localhost:2024")
-        client = get_client(url=langgraph_url)
+        tenant_id = getattr(request.state, "tenant_id", "")
+        enabled_models = load_enabled_tenant_model_names(tenant_id) if tenant_id else []
+        model_name = enabled_models[0] if enabled_models else None
+        if not model_name:
+            raise HTTPException(status_code=403, detail="No enabled tenant-assigned models are available")
+
+        model = create_chat_model(name=model_name, thinking_enabled=False)
 
         steps_text = ""
         if body.diagnosis_steps:
@@ -1087,15 +1123,15 @@ async def summarize_diagnosis(
         if body.user_notes:
             user_notes_text = f"\n用户补充说明：{body.user_notes}"
 
-        gen_prompt = f"""你是运维 SRE 领域的 Skill 指令编写专家。用户完成了一次告警诊断，需要将诊断经验提炼为可复用的 Skill 指令。
+        gen_prompt = f"""你是运维 SRE 领域的 Skill 指令编写专家。用户完成了一次诊断排查，需要将排查经验提炼为可复用的 Skill 指令。
 
-## 告警信息
+## 告警/排查信息
 - 标题：{body.incident_title or '未知'}
 - 服务：{body.incident_service or '未知'}
 - 环境：{body.incident_environment or '未知'}
-- 严重级别：{body.incident_severity}
+- 严重级别：{body.incident_severity or '未知'}
 
-## 诊断结论
+## 排查记录
 {body.diagnosis_result[:3000]}
 
 {steps_text}
@@ -1105,75 +1141,96 @@ async def summarize_diagnosis(
 
 ## 任务要求
 
-请将上述诊断过程提炼为结构化的 Skill 指令。**严格遵循**以下规则：
+请将上述排查过程提炼为结构化的 Skill 指令。**严格遵循**以下规则：
 
 1. **去实例化**：移除所有具体 IP 地址、Pod 名称、节点名、时间戳、具体数值。用 `<pod-name>` 等占位符代替。
 2. **提取通用 SOP**：从单次排查过程抽象出通用的排查流程，让其他运维人员可以复用。
 3. **保留领域知识**：保留关键的检查命令、诊断思路、根因分类、阈值建议。
 4. **中文输出**：所有内容使用简体中文。
 
-## 输出格式（严格按此结构）
+## 输出格式（严格按此结构，分两个代码块）
 
-请返回 JSON，包含以下字段：
-- suggested_name: 英文小写+下划线的短名称（如 k8s_pod_oom_killed）
-- suggested_description: 一句话中文描述（如 "K8s Pod OOMKilled 内存溢出排查"）
-- instructions: Markdown 格式的完整 Skill 指令，包含以下章节：
-  * ## 适用场景
-  * ## 排查步骤（带编号）
-  * ## 关键检查点
-  * ## 常见根因
-  * ## 修复建议
-  * ## 参考命令
-- suggested_tools: 建议绑定的工具列表（英文工具名数组）
-- suggested_category: 建议分类（如 k8s_troubleshooting, network, database, application, infra）
+### 第一个代码块（JSON 元数据）：
+```json
+{{
+  "suggested_name": "英文小写+连字符短名称",
+  "suggested_description": "一句话中文描述",
+  "suggested_tools": ["工具名1", "工具名2"],
+  "suggested_category": "分类"
+}}
+```
 
-输出必须是合法的 JSON，不要包含额外说明文字。"""
+### 第二个代码块（Markdown 指令）：
+```markdown
+## 适用场景
+...
 
-        # Run prompt as a stateless run via LangGraph assistant
-        thread = await client.threads.create()
-        run = await client.runs.create(
-            thread_id=thread["thread_id"],
-            assistant_id="lead_agent",
-            input={"messages": [{"role": "human", "content": gen_prompt}]},
-        )
+## 排查步骤
+1. ...
 
-        # Wait for the run to finish
-        final_messages = []
-        async for event in client.runs.stream(thread["thread_id"], run["run_id"]):
-            if event.get("event") == "messages":
-                msgs = event.get("data", [])
-                for msg in msgs:
-                    if msg.get("role") == "assistant" and msg.get("content"):
-                        final_messages.append(msg)
+## 关键检查点
+- ...
 
-        if not final_messages:
+## 常见根因
+- ...
+
+## 修复建议
+- ...
+
+## 参考命令
+```
+```
+
+请确保两个代码块都完整输出，不要省略任何内容。"""
+
+        response = model.invoke(gen_prompt)
+        output_text = ""
+        if hasattr(response, "content"):
+            content = response.content
+            if isinstance(content, str):
+                output_text = content
+            elif isinstance(content, list):
+                parts = []
+                for block in content:
+                    if isinstance(block, str):
+                        parts.append(block)
+                    elif isinstance(block, dict) and block.get("type") in {"text", "output_text"}:
+                        text = block.get("text")
+                        if isinstance(text, str):
+                            parts.append(text)
+                output_text = "\n".join(parts)
+
+        if not output_text:
             raise HTTPException(status_code=500, detail="AI 返回了空内容，请重试")
 
-        output_text = str(final_messages[-1].get("content", ""))
+        # Parse JSON metadata from the first code block
+        json_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', output_text, re.DOTALL)
+        if not json_match:
+            raise HTTPException(status_code=500, detail="AI 未返回有效的 JSON 元数据，请重试")
+        json_text = json_match.group(1).strip()
 
-        # Parse JSON from LLM response
-        json_text = output_text.strip()
-        # Strip markdown code fences if present
-        if json_text.startswith("```"):
-            lines = json_text.split("\n")
-            if lines[0].startswith("```"):
-                lines = lines[1:]
-            if lines and lines[-1].strip() == "```":
-                lines = lines[:-1]
-            json_text = "\n".join(lines)
+        # Parse instructions from the second code block (markdown)
+        remaining = output_text[json_match.end():]
+        md_match = re.search(r'```(?:markdown)?\s*\n?(.*?)\n?```', remaining, re.DOTALL)
+        instructions = md_match.group(1).strip() if md_match else ""
+        # Fallback: if no second fence, use everything after the first fence as instructions
+        if not instructions:
+            instructions = remaining.strip()
 
         data = _json.loads(json_text)
 
         return SummarizeDiagnosisResponse(
-            suggested_name=str(data.get("suggested_name", "diagnosis_skill")),
+            suggested_name=str(data.get("suggested_name", "diagnosis-skill")),
             suggested_description=str(data.get("suggested_description", "")),
-            instructions=str(data.get("instructions", "")),
+            instructions=instructions or str(data.get("instructions", "")),
             suggested_tools=[str(t) for t in data.get("suggested_tools", [])],
             suggested_category=str(data.get("suggested_category", "custom")),
         )
     except _json.JSONDecodeError as e:
         logger.error(f"Failed to parse LLM JSON response: {e}\nRaw output: {output_text[:500] if 'output_text' in dir() else 'N/A'}")
         raise HTTPException(status_code=500, detail="AI 返回格式异常，请重试")
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to summarize diagnosis: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to summarize diagnosis: {str(e)}")

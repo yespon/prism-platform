@@ -358,6 +358,7 @@ export const enUS: Translations = {
       `${count} summarization${count === 1 ? "" : "s"}`,
     triggerProgress: "Trigger progress",
     triggerThreshold: "Trigger threshold",
+    contextWarning: "Context usage is high. Consider starting a new session for optimal performance.",
   },
 
   // Shortcuts
@@ -1008,6 +1009,7 @@ export const enUS: Translations = {
       user: "User",
       modelLifecycle: "Model Lifecycle",
       memory: "Memory",
+      summarization: "Summarization",
       tools: "Tools",
       skills: "Skills",
       notification: "Notification",
@@ -1047,6 +1049,25 @@ export const enUS: Translations = {
           view: "View",
         },
       },
+    },
+    summarization: {
+      title: "Context Summarization",
+      description:
+        "Automatically compress earlier conversation history when approaching model context limits. Proper configuration prevents context overflow errors while maintaining conversation coherence.",
+      enabled: "Enable Auto-Summarization",
+      enabledDescription: "When enabled, the system will automatically compress conversation history when token or message thresholds are reached.",
+      triggerTokens: "Token Trigger Threshold",
+      triggerTokensDescription:
+        "Summarization triggers when conversation tokens reach this value. The system auto-adjusts based on the model's context window (recommended: 10000-20000).",
+      triggerMessages: "Message Trigger Threshold",
+      triggerMessagesDescription:
+        "Summarization triggers when message count reaches this value, as a supplementary safeguard.",
+      keepMessages: "Messages to Preserve",
+      keepMessagesDescription:
+        "Number of recent complete messages to keep after summarization, preserving the latest conversation context.",
+      trimTokens: "Summary Context Cap",
+      trimTokensDescription:
+        "Maximum tokens of conversation history sent to the summarization model. History exceeding this will be trimmed before generating the summary.",
     },
     appearance: {
       themeTitle: "Theme",

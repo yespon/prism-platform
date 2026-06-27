@@ -56,6 +56,41 @@ class AlertmanagerProvider(BaseAlertProvider):
             occurred_at=raw_alert.received_at,
         )
 
+    def batch_alerts(self, raw_alert: RawAlert, source_config: dict | None = None) -> list[Signal]:
+        """Process all alerts in an Alertmanager webhook payload.
+
+        Returns a list of Signals, one per alert in the ``alerts`` array.
+        This allows batch processing of multiple Prometheus alerts in a single webhook.
+        """
+        alerts = raw_alert.payload_json.get("alerts", [])
+        if not alerts:
+            return []
+
+        signals: list[Signal] = []
+        for alert in alerts:
+            annotations = alert.get("annotations", {})
+            labels = alert.get("labels", {})
+
+            signal = Signal(
+                id="",
+                tenant_id=raw_alert.tenant_id,
+                raw_alert_id=raw_alert.id,
+                source=self.provider_type,
+                service=labels.get("service", ""),
+                environment=labels.get("environment") or labels.get("env", ""),
+                severity=_map_alertmanager_severity(labels.get("severity", "warning")),
+                status="firing" if alert.get("status") == "firing" else "resolved",
+                title=annotations.get("summary") or annotations.get("description", ""),
+                summary=annotations.get("description") or annotations.get("summary", ""),
+                labels_json=labels,
+                fingerprint="",
+                correlation_key="",
+                occurred_at=raw_alert.received_at,
+            )
+            signals.append(signal)
+
+        return signals
+
 
 def _map_alertmanager_severity(severity: str) -> str:
     """Map Alertmanager severity to platform-normalised severity."""

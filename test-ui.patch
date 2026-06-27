@@ -1,0 +1,11 @@
+--- frontend/src/app/workspace/terminal/terminal-agent-ui.tsx
++++ frontend/src/app/workspace/terminal/terminal-agent-ui.tsx
+@@ -28,6 +28,8 @@
+     }
+   }, [models]);
+ 
++  console.log('[TerminalAgentUI] models.length:', models.length, 'selectedModel:', selectedModel);
++
+   const {
+     messages,
+     input,

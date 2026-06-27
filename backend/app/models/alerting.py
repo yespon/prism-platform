@@ -148,6 +148,11 @@ class Incident(SQLModel, table=True):
     diagnosis_result: str | None = Field(default=None, sa_column=Column(Text, nullable=True))  # full agent output
     diagnosis_error: str | None = Field(default=None, sa_column=Column(Text, nullable=True))  # error message if failed
 
+    # Ticket linkage
+    ticket_id: str | None = Field(default=None)  # external ticket ID
+    ticket_url: str | None = Field(default=None)  # external ticket URL
+    ticket_provider: str | None = Field(default=None)  # webhook / jira / ...
+
     created_at: datetime = Field(
         default_factory=_utcnow,
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now()),

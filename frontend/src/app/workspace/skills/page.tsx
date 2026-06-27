@@ -1,14 +1,11 @@
 "use client";
 
-import { Bot, Plus, SearchIcon, Loader2, Upload } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { Bot, Plus, SearchIcon, Loader2, Upload, Trash2, Edit3 } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState, useRef } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -17,35 +14,38 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { useSession } from "@/core/auth/hooks";
 import { useI18n } from "@/core/i18n/hooks";
 import { isPlatformAdminRole } from "@/core/permissions/roles";
-import { useAvailableSkills, useCreatePersonalSkill, useImportPersonalSkill } from "@/core/skills/hooks";
+import { useAvailableSkills, useCreatePersonalSkill, useImportPersonalSkill, useDeletePersonalSkill } from "@/core/skills/hooks";
 import type { AvailableSkillResponse } from "@/core/skills/type";
 
 export default function SkillsCenterPage() {
   const { t } = useI18n();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlFilter = searchParams.get("filter");
   const { data: session } = useSession();
   const { skills, isLoading, error } = useAvailableSkills();
   const [searchTerm, setSearchTerm] = useState("");
-  const [filter, setFilter] = useState<"all" | "personal" | "tenant" | "global">("all");
+  const [filter, setFilter] = useState<"all" | "personal" | "tenant" | "global">(
+    (urlFilter === "personal" || urlFilter === "tenant" || urlFilter === "global") ? urlFilter : "all"
+  );
 
-  // Create Skill state
-  const [createOpen, setCreateOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<"manual" | "import">("manual");
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [boundToolsText, setBoundToolsText] = useState("");
-  const [promptTemplate, setPromptTemplate] = useState("");
-  const [strategy, setStrategy] = useState("default");
+  // Create/Import Skill state
+  const [importOpen, setImportOpen] = useState(false);
   const [archiveFile, setArchiveFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { mutateAsync: createPersonalSkill, isPending: isCreating } = useCreatePersonalSkill();
   const { mutateAsync: importPersonalSkill, isPending: isImporting } = useImportPersonalSkill();
+  const { mutateAsync: deletePersonalSkill, isPending: isDeleting } = useDeletePersonalSkill();
+
+  const [deletingSkill, setDeletingSkill] = useState<string | null>(null);
 
   const isAdmin = isPlatformAdminRole(session?.user?.role) || session?.user?.role === "tenant_admin";
 
@@ -64,11 +64,6 @@ export default function SkillsCenterPage() {
     });
   }, [skills, searchTerm, filter]);
 
-  const parseBoundTools = () =>
-    boundToolsText
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
 
   const handleArchiveSelect = (file: File | null) => {
     if (!file) {
@@ -93,66 +88,37 @@ export default function SkillsCenterPage() {
     handleArchiveSelect(e.dataTransfer.files?.[0] ?? null);
   };
 
-  const handleCreate = async () => {
+  const handleImport = async () => {
     try {
-      if (dialogMode === "import") {
-        if (!archiveFile) {
-          toast.error("请选择要导入的技能包文件");
-          return;
-        }
-        await importPersonalSkill(archiveFile);
-        toast.success("导入成功");
-        setCreateOpen(false);
+      if (!archiveFile) {
+        toast.error("请选择要导入的技能包文件");
         return;
       }
-
-      if (!newName.trim()) {
-        toast.error("请输入 Skill 英文名称");
-        return;
-      }
-      if (!/^[a-z0-9_]+$/.test(newName)) {
-        toast.error("名称只能包含小写字母、数字和下划线");
-        return;
-      }
-      if (!newDescription.trim()) {
-        toast.error("请输入描述");
-        return;
-      }
-
-      await createPersonalSkill({
-        name: newName,
-        description: newDescription.trim(),
-        instructions: instructions.trim() || null,
-        enabled: true,
-        bound_tools: parseBoundTools(),
-        prompt_template: promptTemplate || null,
-        strategy,
-      });
-      toast.success("创建成功");
-      setCreateOpen(false);
-      
-      // Reset form
-      setNewName("");
-      setNewDescription("");
-      setInstructions("");
-      setBoundToolsText("");
-      setPromptTemplate("");
-      setStrategy("default");
+      await importPersonalSkill(archiveFile);
+      toast.success("导入成功");
+      setImportOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "操作失败");
     }
   };
 
-  const handleOpenCreate = () => {
-    setDialogMode("manual");
-    setNewName("");
-    setNewDescription("");
-    setInstructions("");
-    setBoundToolsText("");
-    setPromptTemplate("");
-    setStrategy("default");
+  const handleOpenImport = () => {
     setArchiveFile(null);
-    setCreateOpen(true);
+    setImportOpen(true);
+  };
+
+  const handleDelete = async (skillName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm(`确定要删除私有 Skill "${skillName}" 吗？此操作不可恢复。`)) return;
+    setDeletingSkill(skillName);
+    try {
+      await deletePersonalSkill(skillName);
+      toast.success(`已删除 ${skillName}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "删除失败");
+    } finally {
+      setDeletingSkill(null);
+    }
   };
 
   return (
@@ -160,7 +126,7 @@ export default function SkillsCenterPage() {
       {/* Header */}
       <div className="flex shrink-0 items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">{t.sidebarNav.skillsPlaza}</h1>
+          <h1 className="text-xl font-semibold">{(t.sidebarNav as any).skillsPlaza || 'Skills Plaza'}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             浏览和使用前人沉淀的诊断 SOP，或分享你提炼的经验
           </p>
@@ -187,7 +153,11 @@ export default function SkillsCenterPage() {
           </TabsList>
         </Tabs>
         <div className="ml-auto flex items-center gap-2">
-          <Button onClick={handleOpenCreate}>
+          <Button variant="outline" onClick={handleOpenImport}>
+            <Upload className="mr-2 h-4 w-4" />
+            导入 Skill
+          </Button>
+          <Button onClick={() => router.push("/workspace/skills/new")}>
             <Plus className="mr-2 h-4 w-4" />
             新建私有 Skill
           </Button>
@@ -221,168 +191,91 @@ export default function SkillsCenterPage() {
                 key={skill.name}
                 skill={skill}
                 onClick={() => router.push(`/workspace/skills/${skill.name}`)}
+                onDelete={skill.scope === "personal" ? (e: React.MouseEvent) => handleDelete(skill.name, e) : undefined}
+                isDeleting={deletingSkill === skill.name}
               />
             ))}
           </div>
         )}
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>新建私有 Skill</DialogTitle>
+            <DialogTitle>导入私有 Skill</DialogTitle>
             <DialogDescription>
-              创建一个仅你自己可见的个人草稿箱，测试完备后也可分享。
+              选择本地的 .skill 或 .zip 压缩包导入
             </DialogDescription>
           </DialogHeader>
 
-          <Tabs
-            value={dialogMode}
-            onValueChange={(value) => {
-              setDialogMode(value as "manual" | "import");
-              setArchiveFile(null);
-              setIsDragging(false);
-            }}
-            className="space-y-4"
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="manual">{t.common.create}</TabsTrigger>
-              <TabsTrigger value="import">{t.tenantAdmin.skills.import}</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="manual" className="mt-0 max-h-[60vh] overflow-y-auto px-1 py-2">
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <label htmlFor="name" className="text-sm font-medium">{t.tenantAdmin.skills.nameLabel} <span className="text-destructive">*</span></label>
-                  <Input
-                    id="name"
-                    placeholder={t.tenantAdmin.skills.namePlaceholder}
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                  <p className="text-[10px] text-muted-foreground">仅限小写字母、数字和下划线，作为系统内部标识</p>
+          <div className="grid gap-3 py-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              aria-label={t.tenantAdmin.skills.importFileLabel}
+              accept=".skill,.zip,application/zip"
+              className="hidden"
+              onChange={(e) => {
+                handleArchiveSelect(e.target.files?.[0] ?? null);
+                e.currentTarget.value = "";
+              }}
+            />
+            <div
+              className={`cursor-pointer rounded-lg border-2 border-dashed p-8 transition-colors ${
+                isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+              }`}
+              role="button"
+              tabIndex={0}
+              onClick={openArchivePicker}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  openArchivePicker();
+                }
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setIsDragging(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                setIsDragging(false);
+              }}
+              onDrop={handleDrop}
+            >
+              <div className="flex flex-col items-center justify-center gap-4 text-center">
+                <div className="rounded-full bg-muted p-3">
+                  <Upload className="h-6 w-6 text-muted-foreground" />
                 </div>
-                <div className="grid gap-2">
-                  <label htmlFor="description" className="text-sm font-medium">{t.tenantAdmin.skills.descriptionLabel} <span className="text-destructive">*</span></label>
-                  <Input
-                    id="description"
-                    placeholder={t.tenantAdmin.skills.descriptionPlaceholder}
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                  />
+                <div>
+                  <div className="text-sm font-medium">{t.tenantAdmin.skills.importFileLabel}</div>
+                  <p className="mt-1 text-sm text-muted-foreground">{t.tenantAdmin.skills.importFileHint}</p>
                 </div>
-                <div className="grid gap-2">
-                  <label htmlFor="instructions" className="text-sm font-medium">{t.tenantAdmin.skills.instructionsLabel}</label>
-                  <Textarea
-                    id="instructions"
-                    className="min-h-32"
-                    placeholder={t.tenantAdmin.skills.instructionsPlaceholder}
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="bound-tools" className="text-sm font-medium">{t.tenantAdmin.skills.toolsLabel}</label>
-                  <Input
-                    id="bound-tools"
-                    placeholder={t.tenantAdmin.skills.toolsPlaceholder}
-                    value={boundToolsText}
-                    onChange={(e) => setBoundToolsText(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="strategy" className="text-sm font-medium">{t.tenantAdmin.skills.strategyLabel}</label>
-                  <Input
-                    id="strategy"
-                    placeholder={t.tenantAdmin.skills.strategyPlaceholder}
-                    value={strategy}
-                    onChange={(e) => setStrategy(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <label htmlFor="prompt-template" className="text-sm font-medium">{t.tenantAdmin.skills.promptTemplateLabel}</label>
-                  <Textarea
-                    id="prompt-template"
-                    className="min-h-24"
-                    placeholder={t.tenantAdmin.skills.promptTemplatePlaceholder}
-                    value={promptTemplate}
-                    onChange={(e) => setPromptTemplate(e.target.value)}
-                  />
+                <div className="flex flex-col items-center gap-2">
+                  <Button type="button" variant="outline" onClick={(e) => {
+                    e.stopPropagation();
+                    openArchivePicker();
+                  }}>
+                    {t.tenantAdmin.skills.importFileLabel}
+                  </Button>
+                  {archiveFile && (
+                    <span className="text-sm font-medium text-primary">{archiveFile.name}</span>
+                  )}
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="import" className="mt-0">
-              <div className="grid gap-3 py-1">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  aria-label={t.tenantAdmin.skills.importFileLabel}
-                  accept=".skill,.zip,application/zip"
-                  className="hidden"
-                  onChange={(e) => {
-                    handleArchiveSelect(e.target.files?.[0] ?? null);
-                    e.currentTarget.value = "";
-                  }}
-                />
-                <div
-                  className={`cursor-pointer rounded-lg border-2 border-dashed p-8 transition-colors ${
-                    isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-                  }`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={openArchivePicker}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      openArchivePicker();
-                    }
-                  }}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setIsDragging(true);
-                  }}
-                  onDragLeave={(e) => {
-                    e.preventDefault();
-                    setIsDragging(false);
-                  }}
-                  onDrop={handleDrop}
-                >
-                  <div className="flex flex-col items-center justify-center gap-4 text-center">
-                    <div className="rounded-full bg-muted p-3">
-                      <Upload className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <div className="text-sm font-medium">{t.tenantAdmin.skills.importFileLabel}</div>
-                      <p className="mt-1 text-sm text-muted-foreground">{t.tenantAdmin.skills.importFileHint}</p>
-                    </div>
-                    <div className="flex flex-col items-center gap-2">
-                      <Button type="button" variant="outline" onClick={(e) => {
-                        e.stopPropagation();
-                        openArchivePicker();
-                      }}>
-                        {t.tenantAdmin.skills.importFileLabel}
-                      </Button>
-                      {archiveFile && (
-                        <span className="text-sm font-medium text-primary">{archiveFile.name}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
+            <Button variant="outline" onClick={() => setImportOpen(false)}>
               {t.common.cancel}
             </Button>
             <Button 
-              onClick={handleCreate} 
-              disabled={isCreating || isImporting || (dialogMode === "import" && !archiveFile)}
+              onClick={handleImport} 
+              disabled={isImporting || !archiveFile}
             >
-              {(isCreating || isImporting) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {dialogMode === "import" ? t.tenantAdmin.skills.import : t.tenantAdmin.skills.save}
+              {isImporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {t.tenantAdmin.skills.import}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -394,15 +287,46 @@ export default function SkillsCenterPage() {
 function SkillCard({
   skill,
   onClick,
+  onDelete,
+  isDeleting,
 }: {
   skill: AvailableSkillResponse;
   onClick: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
+  isDeleting?: boolean;
 }) {
+  const canEdit = skill.managed_by_current_user && skill.scope !== "global";
+
   return (
     <div
-      onClick={onClick}
-      className="group cursor-pointer rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-primary/30"
+      className="group relative rounded-xl border bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md"
     >
+      {/* Action buttons for editable skills */}
+      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {canEdit && (
+          <button
+            onClick={onClick}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-primary hover:bg-primary/10 transition-colors"
+            title="编辑此 Skill"
+          >
+            <Edit3 className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={onDelete}
+            disabled={isDeleting}
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors"
+            title="删除此 Skill"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+          </button>
+        )}
+      </div>
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">

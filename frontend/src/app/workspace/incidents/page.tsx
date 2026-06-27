@@ -12,7 +12,8 @@ import {
   VolumeXIcon,
   FilterIcon,
   TagIcon,
-  RefreshCwIcon
+  RefreshCwIcon,
+  UserIcon
 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -24,7 +25,7 @@ import {
   WorkspaceContainer,
   WorkspaceBody
 } from "@/components/workspace/workspace-container";
-import { useIncidents, getSeverityBadgeStyles, formatDate, type IncidentSummary } from "@/core/alerting";
+import { useIncidents, useIncidentStats, getSeverityBadgeStyles, formatDate, type IncidentSummary } from "@/core/alerting";
 
 const PAGE_SIZE = 15;
 
@@ -63,6 +64,11 @@ export default function WorkspaceIncidentsPage() {
     setCurrentPage(0);
   };
 
+  // Dashboard stats
+  const { data: stats, isLoading: statsLoading } = useIncidentStats();
+
+  const maxTrendCount = stats ? Math.max(1, ...stats.recent_trend.map(d => d.count)) : 1;
+
   return (
     <WorkspaceContainer>
       <WorkspaceBody className="bg-zinc-50 dark:bg-zinc-950">
@@ -92,6 +98,92 @@ export default function WorkspaceIncidentsPage() {
               </Button>
             </div>
           </div>
+
+          {/* Dashboard Stats - Premium Compact Layout */}
+          {stats && !statsLoading && (
+            <div className="mt-6 flex flex-col xl:flex-row gap-4">
+              
+              {/* Left: Core KPIs */}
+              <div className="flex-1 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-background shadow-sm flex divide-x divide-zinc-200 dark:divide-zinc-800 overflow-hidden">
+                <div className="flex-1 p-5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <ActivityIcon className="w-16 h-16 text-rose-500 transform group-hover:scale-110 transition-transform duration-500" />
+                  </div>
+                  <div className="relative z-10">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">进行中 (Firing)</span>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                      </span>
+                    </div>
+                    <div className="mt-2 text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+                      {stats.total_firing}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 p-5 relative overflow-hidden">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">已恢复 (Resolved)</span>
+                    <CheckCircle2Icon className="h-3 w-3 text-emerald-500" />
+                  </div>
+                  <div className="mt-2 text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+                    {stats.total_resolved}
+                  </div>
+                </div>
+
+                <div className="flex-1 p-5 relative overflow-hidden">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">平均恢复时间 (MTTR)</span>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+                      {stats.mttr_minutes ? Math.round(stats.mttr_minutes) : "--"}
+                    </span>
+                    {stats.mttr_minutes && <span className="text-xs font-semibold text-zinc-400">min</span>}
+                  </div>
+                </div>
+
+                <div className="flex-1 p-5 relative overflow-hidden">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">平均响应时间 (MTTA)</span>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-50">
+                      {stats.mtta_minutes ? Math.round(stats.mtta_minutes) : "--"}
+                    </span>
+                    {stats.mtta_minutes && <span className="text-xs font-semibold text-zinc-400">min</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right: Trend Sparkline */}
+              <div className="w-full xl:w-[22rem] rounded-xl border border-zinc-200 dark:border-zinc-800 bg-background shadow-sm p-5 flex flex-col justify-between">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400">最近 7 天新建告警</span>
+                  <span className="text-[10px] font-mono text-zinc-400">总计: {stats.recent_trend.reduce((a, b) => a + b.count, 0)}</span>
+                </div>
+                <div className="flex items-end gap-1.5 h-16 mt-auto">
+                  {stats.recent_trend.map((day) => {
+                    const height = Math.max(5, (day.count / maxTrendCount) * 100);
+                    const hasData = day.count > 0;
+                    return (
+                      <div key={day.date} className="flex-1 flex flex-col items-center gap-1.5 group relative">
+                        <div
+                          className={`w-full rounded-sm transition-all duration-500 ${hasData ? "bg-indigo-500/80 group-hover:bg-indigo-500" : "bg-zinc-100 dark:bg-zinc-800"}`}
+                          style={{ height: `${height}%` }}
+                        />
+                        <span className="text-[9px] text-zinc-400 font-mono scale-90">{day.date.slice(5)}</span>
+                        
+                        {/* Tooltip */}
+                        <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 text-white text-[10px] font-mono py-0.5 px-2 rounded pointer-events-none whitespace-nowrap">
+                          {day.count}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+          )}
 
           {/* 状态大 Tab 切换 */}
           <div className="mt-8 flex border-b border-zinc-200 dark:border-zinc-800">
@@ -287,8 +379,15 @@ export default function WorkspaceIncidentsPage() {
                         </div>
                       </div>
 
-                      {/* 右半部分：归并信号数 + 查看箭头 */}
+                      {/* 右半部分：owner + 归并信号数 + 查看箭头 */}
                       <div className="flex items-center justify-between sm:justify-end gap-6 border-t border-zinc-100 pt-3 sm:border-none sm:pt-0 shrink-0">
+                        {incident.owner_user_id && (
+                          <div className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400">
+                            <UserIcon className="h-3 w-3" />
+                            <span className="font-medium max-w-[80px] truncate">{incident.owner_user_id}</span>
+                          </div>
+                        )}
+
                         <div className="text-left sm:text-right">
                           <span className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
                             {incident.signal_count}

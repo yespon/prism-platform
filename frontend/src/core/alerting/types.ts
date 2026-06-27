@@ -25,6 +25,7 @@ export interface IncidentSummary {
   last_seen_at: string;
   agent_id: string | null;
   diagnosis_status: string | null;
+  owner_user_id: string | null;
 }
 
 export interface IncidentDetail {
@@ -37,6 +38,7 @@ export interface IncidentDetail {
   status: string;
   service: string | null;
   environment: string | null;
+  owner_user_id: string | null;
   signal_count: number;
   first_seen_at: string;
   last_seen_at: string;
@@ -52,6 +54,9 @@ export interface IncidentDetail {
   diagnosis_status: string | null;
   diagnosis_result: string | null;
   diagnosis_error: string | null;
+  ticket_id: string | null;
+  ticket_url: string | null;
+  ticket_provider: string | null;
   owner_team_id: string | null;
   signals: Signal[];
   related_incidents: IncidentSummary[];
@@ -110,9 +115,9 @@ export interface AlertSourceUpdate {
 export interface AlertRule {
   id: string;
   name: string;
-  rule_type: "suppression" | "aggregation" | "dedup";
+  rule_type: "suppression" | "aggregation" | "dedup" | "escalation";
   enabled: boolean;
-  condition_json: AlertRuleCondition;
+  condition_json: Record<string, unknown>;
   action_json: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -131,9 +136,9 @@ export interface AlertRuleConditionItem {
 
 export interface AlertRuleCreate {
   name: string;
-  rule_type: "suppression" | "aggregation" | "dedup";
+  rule_type: "suppression" | "aggregation" | "dedup" | "escalation";
   enabled?: boolean;
-  condition_json: AlertRuleCondition;
+  condition_json: Record<string, unknown>;
   action_json: Record<string, unknown>;
 }
 
@@ -141,7 +146,7 @@ export interface AlertRuleUpdate {
   name?: string;
   rule_type?: string;
   enabled?: boolean;
-  condition_json?: AlertRuleCondition;
+  condition_json?: Record<string, unknown>;
   action_json?: Record<string, unknown>;
 }
 

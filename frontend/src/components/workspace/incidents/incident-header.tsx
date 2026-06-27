@@ -5,10 +5,15 @@ import {
   CheckCircle2Icon,
   ClockIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   RefreshCwIcon,
   SparklesIcon,
   TagIcon,
+  TerminalIcon,
+  UserIcon,
+  UserPlusIcon,
   VolumeXIcon,
+  TicketIcon,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +27,16 @@ interface IncidentHeaderProps {
   onUnsuppress: () => void;
   onOpenDiagnosis: () => void;
   onExportReport: () => void;
+  onClaim: () => void;
+  onResolve: () => void;
+  onCreateTicket: () => void;
+  onGoToTerminal: () => void;
   suppressing: boolean;
   unsuppressing: boolean;
   diagnosing: boolean;
+  claiming: boolean;
+  resolving: boolean;
+  creatingTicket: boolean;
   currentThreadId: string | null | undefined;
 }
 
@@ -34,9 +46,16 @@ export function IncidentHeader({
   onUnsuppress,
   onOpenDiagnosis,
   onExportReport,
+  onClaim,
+  onResolve,
+  onCreateTicket,
+  onGoToTerminal,
   suppressing,
   unsuppressing,
   diagnosing,
+  claiming,
+  resolving,
+  creatingTicket,
   currentThreadId,
 }: IncidentHeaderProps) {
   return (
@@ -75,6 +94,26 @@ export function IncidentHeader({
                 已静默
               </span>
             )}
+
+            {incident.owner_user_id && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400">
+                <UserIcon className="h-3 w-3" />
+                {incident.owner_user_id}
+              </span>
+            )}
+
+            {incident.ticket_id && incident.ticket_url && (
+              <a
+                href={incident.ticket_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-xs font-medium text-sky-700 hover:text-sky-800 dark:bg-sky-950/20 dark:text-sky-400 dark:hover:text-sky-300 transition-colors"
+              >
+                <TicketIcon className="h-3 w-3" />
+                工单: {incident.ticket_id}
+                <ExternalLinkIcon className="h-3 w-3" />
+              </a>
+            )}
           </div>
 
           <h2 className="mt-3 text-lg font-bold tracking-tight text-zinc-900 dark:text-zinc-50 leading-snug">
@@ -102,6 +141,19 @@ export function IncidentHeader({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0 border-t border-zinc-100 pt-4 md:border-none md:pt-0">
+          {incident.status === "firing" && !incident.owner_user_id && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 border-indigo-300 dark:border-indigo-800 bg-indigo-50/50 hover:bg-indigo-100 dark:bg-indigo-950/20 dark:hover:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400"
+              onClick={onClaim}
+              disabled={claiming}
+            >
+              <UserPlusIcon className="h-3.5 w-3.5" />
+              {claiming ? "认领中..." : "认领"}
+            </Button>
+          )}
+
           {incident.status === "firing" && (
             <Button
               variant="outline"
@@ -128,6 +180,19 @@ export function IncidentHeader({
             </Button>
           )}
 
+          {incident.status !== "resolved" && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 border-emerald-300 dark:border-emerald-800 bg-emerald-50/50 hover:bg-emerald-100 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
+              onClick={onResolve}
+              disabled={resolving}
+            >
+              <CheckCircle2Icon className="h-3.5 w-3.5" />
+              {resolving ? "恢复中..." : "标记已恢复"}
+            </Button>
+          )}
+
           {incident.status === "firing" && (
             <Button
               size="sm"
@@ -144,6 +209,19 @@ export function IncidentHeader({
             </Button>
           )}
 
+          {!incident.ticket_id && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 h-9 border-sky-300 dark:border-sky-800 bg-sky-50/50 hover:bg-sky-100 dark:bg-sky-950/20 dark:hover:bg-sky-950/40 text-sky-700 dark:text-sky-400"
+              onClick={onCreateTicket}
+              disabled={creatingTicket}
+            >
+              <TicketIcon className="h-3.5 w-3.5" />
+              {creatingTicket ? "创建中..." : "创建工单"}
+            </Button>
+          )}
+
           <Button
             variant="outline"
             size="sm"
@@ -153,6 +231,17 @@ export function IncidentHeader({
             <DownloadIcon className="h-3.5 w-3.5" />
             导出诊断报告
           </Button>
+
+          {incident.status === "firing" && (incident.ai_summary || incident.ai_suggestion) && (
+            <Button
+              size="sm"
+              className="gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-500 text-white font-medium shadow-sm shadow-emerald-500/20"
+              onClick={onGoToTerminal}
+            >
+              <TerminalIcon className="h-3.5 w-3.5" />
+              到终端排查
+            </Button>
+          )}
         </div>
 
       </div>

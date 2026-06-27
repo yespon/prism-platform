@@ -1,11 +1,12 @@
 "use client";
 
-import { ShieldAlertIcon, CableIcon, SlidersIcon, SettingsIcon } from "lucide-react";
+import { ShieldAlertIcon, CableIcon, SlidersIcon, SettingsIcon, ActivityIcon } from "lucide-react";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AlertSourcesTab } from "./alert-sources-tab";
 import { AlertRulesTab } from "./alert-rules-tab";
 import { AlertingSettingsTab } from "./alerting-settings-tab";
+import { EscalationRulesPanel } from "@/components/workspace/incidents/escalation-rules-panel";
 
 export function TenantAdminAlertsPage() {
   return (
@@ -26,15 +27,15 @@ export function TenantAdminAlertsPage() {
         <TabsList className="grid w-fit grid-cols-3 mb-6 h-10 p-1 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
           <TabsTrigger value="sources" className="flex items-center gap-1.5 px-4 text-xs font-semibold">
             <CableIcon className="h-3.5 w-3.5" />
-            告警源接入
+            接入源与映射
           </TabsTrigger>
           <TabsTrigger value="rules" className="flex items-center gap-1.5 px-4 text-xs font-semibold">
             <SlidersIcon className="h-3.5 w-3.5" />
-            智能治理规则
+            治理与升级规则
           </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-1.5 px-4 text-xs font-semibold">
             <SettingsIcon className="h-3.5 w-3.5" />
-            告警设置
+            全局设置
           </TabsTrigger>
         </TabsList>
 
@@ -42,8 +43,9 @@ export function TenantAdminAlertsPage() {
           <AlertSourcesTab />
         </TabsContent>
 
-        <TabsContent value="rules" className="space-y-4 focus-visible:outline-none">
+        <TabsContent value="rules" className="space-y-8 focus-visible:outline-none">
           <AlertRulesTab />
+          <EscalationRulesPanel />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4 focus-visible:outline-none">

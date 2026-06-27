@@ -327,28 +327,28 @@ export default function WorkspaceOverviewPage() {
             <AlertMetricCard
               icon={Flame}
               label={alertText.firing}
-              value={statsLoading ? "—" : (stats?.firing ?? 0)}
+              value={statsLoading ? "—" : (stats?.total_firing ?? 0)}
               colorClass="text-red-600 dark:text-red-400"
               iconColorClass="text-red-500"
             />
             <AlertMetricCard
               icon={CheckCircle2}
               label={alertText.resolved}
-              value={statsLoading ? "—" : (stats?.resolved ?? 0)}
+              value={statsLoading ? "—" : (stats?.total_resolved ?? 0)}
               colorClass="text-emerald-600 dark:text-emerald-400"
               iconColorClass="text-emerald-500"
             />
             <AlertMetricCard
               icon={BellOff}
               label={alertText.suppressed}
-              value={statsLoading ? "—" : (stats?.suppressed ?? 0)}
+              value={statsLoading ? "—" : (stats?.total_suppressed ?? 0)}
               colorClass="text-zinc-500 dark:text-zinc-400"
               iconColorClass="text-zinc-400"
             />
             <AlertMetricCard
               icon={Activity}
               label={alertText.total}
-              value={statsLoading ? "—" : (stats?.total ?? 0)}
+              value={statsLoading ? "—" : ((stats?.total_firing ?? 0) + (stats?.total_resolved ?? 0) + (stats?.total_suppressed ?? 0))}
               colorClass="text-indigo-600 dark:text-indigo-400"
               iconColorClass="text-indigo-500"
             />
@@ -418,49 +418,9 @@ export default function WorkspaceOverviewPage() {
                 }
               >
                 <div className="mt-4">
-                  {!stats?.recent_incidents || stats.recent_incidents.length === 0 ? (
-                    <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg bg-background/20">
-                      {alertText.noRecent}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border overflow-hidden">
-                      <ul className="divide-y divide-zinc-100 dark:divide-zinc-900 bg-background/30">
-                        {stats.recent_incidents.map((incident) => (
-                          <li key={incident.id} className="hover:bg-background/80 transition-colors">
-                            <Link
-                              href={`/workspace/incidents/${incident.id}`}
-                              className="flex items-center justify-between gap-4 p-4"
-                            >
-                              <div className="min-w-0 space-y-1">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="text-xs font-mono font-bold text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded">
-                                    {incident.incident_key}
-                                  </span>
-                                  <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${getSeverityBadgeClass(incident.severity)}`}>
-                                    {locale === "zh-CN"
-                                      ? (incident.severity === "critical" ? "紧急" : incident.severity === "major" ? "重要" : incident.severity === "warning" ? "警告" : incident.severity === "minor" ? "次要" : "提示")
-                                      : incident.severity}
-                                  </span>
-                                </div>
-                                <h4 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate leading-snug">
-                                  {incident.title ?? "Untitled Incident"}
-                                </h4>
-                                {incident.service && (
-                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Server className="h-3 w-3" />
-                                    <span>{incident.service}</span>
-                                  </div>
-                                )}
-                              </div>
-                              <span className="shrink-0 text-xs text-muted-foreground font-medium">
-                                {formatRelativeTime(incident.last_seen_at, locale)}
-                              </span>
-                            </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg bg-background/20">
+                    {alertText.noRecent}
+                  </div>
                 </div>
               </OverviewSectionCard>
             </div>

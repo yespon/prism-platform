@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import type { AnchorHTMLAttributes } from "react";
 
 import { CodeBlock, CodeBlockCopyButton } from "@/components/ai-elements/code-block";
@@ -10,6 +10,8 @@ import {
 } from "@/components/ai-elements/message";
 import { streamdownPlugins } from "@/core/streamdown";
 import { cn } from "@/lib/utils";
+import { useTerminalContext } from "@/app/workspace/terminal/context";
+import { Play, Loader2, CheckCircle2 } from "lucide-react";
 
 import { CitationLink } from "../citations/citation-link";
 
@@ -34,8 +36,14 @@ export function MarkdownContent({
   remarkPlugins = streamdownPlugins.remarkPlugins,
   components: componentsFromProps,
 }: MarkdownContentProps) {
+  const terminalContext = useTerminalContext();
+
   const components = useMemo(() => {
     return {
+      p: (props: any) => {
+        const { node, ...rest } = props;
+        return <div className="mb-3 last:mb-0" {...rest} />;
+      },
       a: (props: AnchorHTMLAttributes<HTMLAnchorElement>) => {
         if (typeof props.children === "string") {
           const match = /^citation:(.+)$/.exec(props.children);
@@ -108,11 +116,98 @@ export function MarkdownContent({
           </code>
         );
       },
+      execute_command: ({ children }: any) => {
+        const cmd = Array.isArray(children) ? children.join("") : String(children);
+        const [isExecuting, setIsExecuting] = React.useState(false);
+        const [isFinished, setIsFinished] = React.useState(false);
+
+        const handleRun = async () => {
+          if (!terminalContext) return;
+          setIsExecuting(true);
+          try {
+            const output = await terminalContext.executeCommand(cmd);
+            setIsFinished(true);
+            
+            // Send the result back to the LLM
+            if (terminalContext.sendMessageRef.current) {
+              const resultMessage = `<tool_result>\n${output || 'Command executed successfully with no output.'}\n</tool_result>`;
+              terminalContext.sendMessageRef.current(resultMessage);
+            }
+          } catch (e: any) {
+            console.error("Execute error:", e);
+            if (terminalContext.sendMessageRef.current) {
+              const errorMessage = `<tool_result>\nError executing command:\n${e?.message || String(e)}\n</tool_result>`;
+              terminalContext.sendMessageRef.current(errorMessage);
+            }
+          } finally {
+            setIsExecuting(false);
+          }
+        };
+
+        return (
+          <div className="my-4 overflow-hidden rounded-xl border border-blue-200 bg-blue-50/50 shadow-sm">
+            <div className="flex items-center justify-between bg-blue-100/50 px-4 py-2 border-b border-blue-200/50">
+              <div className="flex items-center gap-2 text-blue-700 font-medium text-xs">
+                <div className="size-5 rounded-md bg-blue-600 flex items-center justify-center text-white">
+                  <Play className="size-3" fill="currentColor" />
+                </div>
+                Command Suggestion
+              </div>
+              {terminalContext && (
+                <button
+                  onClick={handleRun}
+                  disabled={isExecuting || isFinished}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all",
+                    isFinished
+                      ? "bg-emerald-100 text-emerald-700 cursor-not-allowed"
+                      : isExecuting
+                        ? "bg-blue-200 text-blue-700 cursor-not-allowed"
+                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                  )}
+                >
+                  {isFinished ? (
+                    <>
+                      <CheckCircle2 className="size-3.5" /> Done
+                    </>
+                  ) : isExecuting ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" /> Running
+                    </>
+                  ) : (
+                    <>
+                      Run in Terminal
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+            <div className="p-4 bg-white/60 font-mono text-[13px] text-zinc-800 break-all whitespace-pre-wrap leading-relaxed">
+              {cmd}
+            </div>
+          </div>
+        );
+      },
       ...componentsFromProps,
     };
-  }, [componentsFromProps]);
+  }, [componentsFromProps, terminalContext]);
 
   if (!content) return null;
+
+  // Preprocess: escape XML tool_call/function/parameter tags that models leak into text.
+  // These get rendered as HTML by the markdown parser, so we escape them to plain text.
+  // Only process outside markdown code blocks to avoid breaking execute_command cards.
+  const cleanContent = useMemo(() => {
+    const parts = content.split(/(```[\s\S]*?```)/g);
+    const cleaned = parts.map((part, idx) => {
+      if (idx % 2 === 1) return part; // skip code blocks
+      // Escape <tool_call>, <function=...>, <parameter=...> and their closing tags
+      return part
+        .replace(/<(\/?)(tool_call|function|parameter)([^>]*)>/g, '&lt;$1$2$3&gt;')
+        .replace(/\n{3,}/g, '\n\n');
+    });
+    return cleaned.join('').trim();
+  }, [content]);
 
   return (
     <MessageResponse
@@ -149,7 +244,7 @@ export function MarkdownContent({
       rehypePlugins={rehypePlugins}
       components={components}
     >
-      {content}
+      {cleanContent}
     </MessageResponse>
   );
 }

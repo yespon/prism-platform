@@ -345,6 +345,7 @@ export const zhCN: Translations = {
       `已汇总 ${count} 次`,
     triggerProgress: "触发进度",
     triggerThreshold: "触发阈值",
+    contextWarning: "上下文使用率较高，建议开始新会话以保持最佳性能",
   },
 
   // Shortcuts
@@ -995,6 +996,7 @@ export const zhCN: Translations = {
       user: "用户",
       modelLifecycle: "模型管理",
       memory: "记忆",
+      summarization: "上下文压缩",
       tools: "工具",
       skills: "技能",
       notification: "通知",
@@ -1034,6 +1036,25 @@ export const zhCN: Translations = {
           view: "查看",
         },
       },
+    },
+    summarization: {
+      title: "上下文压缩",
+      description:
+        "当对话历史接近模型上下文限制时，自动对较早的对话进行摘要压缩。合理设置可以避免上下文溢出错误，同时保持对话连贯性。",
+      enabled: "启用自动压缩",
+      enabledDescription: "开启后，系统会在对话 token 数或消息数达到阈值时自动压缩历史对话。",
+      triggerTokens: "Token 触发阈值",
+      triggerTokensDescription:
+        "当对话累计 token 数达到此值时触发压缩。系统会根据模型的上下文窗口自动调整（建议 10000-20000）。",
+      triggerMessages: "消息数触发阈值",
+      triggerMessagesDescription:
+        "当对话消息数达到此值时触发压缩，作为 Token 阈值的补充保护。",
+      keepMessages: "压缩后保留消息数",
+      keepMessagesDescription:
+        "压缩后保留最近的 N 条完整消息，避免丢失最新的对话上下文。",
+      trimTokens: "摘要上下文上限",
+      trimTokensDescription:
+        "送给摘要模型的对话历史 token 上限。超过此值的历史会被裁剪后再生成摘要。",
     },
     appearance: {
       themeTitle: "主题",

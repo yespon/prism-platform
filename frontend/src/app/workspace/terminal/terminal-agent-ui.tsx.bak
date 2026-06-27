@@ -1,0 +1,824 @@
+'use client';
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTerminalAgent } from '@/core/terminal-agent/useTerminalAgent';
+import { CommandInteractionInput } from '@/core/terminal-agent/command-interaction-input';
+import { useTerminalContext } from '@/app/workspace/terminal/context';
+import { SecuritySettingsPanel } from '@/core/terminal-agent/security/security-settings-ui';
+import { ChatHistoryManager, type ChatMessage } from '@/core/terminal-agent/chat-history';
+import {
+  Monitor, X, Plus, RotateCcw, MoreHorizontal,
+  Mic, Image as ImageIcon, ArrowUp, ChevronDown,
+  TerminalSquare, Loader2, ShieldAlert, AlertTriangle,
+  ThumbsUp, ThumbsDown, Settings, History, Check, ChevronLeft,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useAvailableModels } from '@/core/models/hooks';
+
+/** Extract text content from AI SDK v6 message parts array */
+function getMessageText(msg: any): string {
+  if (!msg?.parts) return msg?.content || '';
+  return msg.parts.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('\n');
+}
+
+/** Extract reasoning/thinking content from AI SDK v6 message parts */
+function getReasoningText(msg: any): string {
+  if (!msg?.parts) return '';
+  return msg.parts.filter((p: any) => p.type === 'reasoning').map((p: any) => p.text).join('\n');
+}
+
+/**
+ * Extract tool invocations from AI SDK v6 UIMessage.
+ *
+ * In AI SDK v6, tool parts have type `tool-${toolName}` (e.g. `tool-execute_command`)
+ * and the tool data (toolCallId, state, input, output) is directly on the part object.
+ * State values: 'input-streaming' | 'input-available' | 'output-available' | 'output-error'.
+ */
+function getToolInvocations(msg: any): any[] {
+  if (!msg) return [];
+
+  // 1. Scan parts for tool-* types (registered tools) or dynamic-tool (unregistered)
+  if (Array.isArray(msg.parts)) {
+    return msg.parts
+      .filter((p: any) => {
+        const t = p.type || '';
+        return t.startsWith('tool-') || t === 'dynamic-tool';
+      })
+      .map((p: any) => {
+        // Normalise to a common shape for rendering
+        const toolName = p.toolName || (p.type && p.type.startsWith('tool-') ? p.type.slice(5) : p.type);
+        return {
+          toolCallId: p.toolCallId,
+          toolName,
+          state: p.state,        // 'input-streaming' | 'input-available' | 'output-available'
+          input: p.input || {},  // tool args
+          output: p.output,      // tool result (only in output-available state)
+          errorText: p.errorText,
+          // Legacy aliases for rendering code compatibility
+          get args() { return this.input; },
+          get result() { return this.output; },
+        };
+      });
+  }
+
+  return [];
+}
+
+export function TerminalAgentUI({ activeAsset }: { activeAsset: any }) {
+  const terminalContext = useTerminalContext();
+  const { models } = useAvailableModels();
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o');
+  const [showSecuritySettings, setShowSecuritySettings] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessionId] = useState(() => ChatHistoryManager.generateId());
+  const [sessionTitle, setSessionTitle] = useState('新会话');
+  const [messageFeedback, setMessageFeedback] = useState<Record<string, 'up' | 'down'>>({});
+  const [mode, setMode] = useState<'cmd' | 'agent'>('cmd');
+  
+  // Context Menu State
+  const [showContextMenu, setShowContextMenu] = useState(false);
+  const [contextMenuSearch, setContextMenuSearch] = useState('');
+  const [assets, setAssets] = useState<any[]>([]);
+  const [selectedAgentAsset, setSelectedAgentAsset] = useState<any | null>(null);
+
+  useEffect(() => {
+    fetch('/api/v1/assets/local')
+      .then(res => res.json())
+      .then(data => setAssets(Array.isArray(data) ? data : []))
+      .catch(console.error);
+  }, []);
+
+  // Throttle state for message rendering
+  const throttledRef = useRef(false);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (models.length > 0 && !models.find((m) => m.name === selectedModel)) {
+      setSelectedModel(models[0]?.name || 'gpt-4o');
+    }
+  }, [models]);
+
+  // =========================================================
+  // Slash command handling
+  // =========================================================
+  const SLASH_COMMANDS: Record<string, { name: string; description: string; systemReminder: string }> = {
+    '/summary-to-doc': {
+      name: 'summary-to-doc',
+      description: '将当前对话总结为知识库文档',
+      systemReminder: '\n\n【system-reminder】用户使用了 /summary-to-doc 命令。请总结当前会话中的关键知识、发现和操作步骤，整理成结构化的文档。使用 execute_command 或其他工具验证内容准确性。输出应为完整的 Markdown 文档格式。\n',
+    },
+    '/summary-to-skill': {
+      name: 'summary-to-skill',
+      description: '将当前对话中的操作流程总结为可复用的技能',
+      systemReminder: '\n\n【system-reminder】用户使用了 /summary-to-skill 命令。请分析当前会话中的操作流程、命令序列和最佳实践，将其提炼为一个可复用的技能/脚本。技能应包含：名称、描述、适用场景、执行步骤、注意事项。\n',
+    },
+  };
+
+  const handleExecuteCommand = async (command: string): Promise<string> => {
+    if (!terminalContext?.executeCommand) throw new Error('Terminal not ready');
+    return terminalContext.executeCommand(command);
+  };
+
+  const handleSendInput = (input: string): void => {
+    if (!terminalContext?.terminalRef?.current) return;
+    terminalContext.terminalRef.current.injectCommand(input);
+  };
+
+  const handleCancelCommand = (): void => {
+    if (!terminalContext?.terminalRef?.current) return;
+    terminalContext.terminalRef.current.injectCommand('\x03');
+  };
+
+  const {
+    messages, input, handleInputChange, handleSubmit,
+    isLoading, isDetectingInteraction,
+    sendMessage, addToolResult,
+    todos,
+    currentInteraction,
+    submitInteraction, dismissInteraction, suppressInteraction,
+    cancelCommand, commandOutput, isCommandRunning,
+    executePendingCommand, rejectPendingCommand,
+    pendingDangerousTool,
+    confirmDangerousCommand, rejectDangerousCommand,
+  } = useTerminalAgent({
+    taskId: sessionId,
+    terminalSessionId: terminalContext?.activeSessionId,
+    mode,
+    modelName: selectedModel,
+    assetId: mode === 'agent' && selectedAgentAsset ? selectedAgentAsset.id : activeAsset?.id,
+    assetIp: mode === 'agent' && selectedAgentAsset ? selectedAgentAsset.ip : activeAsset?.ip,
+    onExecuteCommand: handleExecuteCommand,
+    onSendInput: handleSendInput,
+    onCancelCommand: handleCancelCommand,
+  });
+
+  // Slash-aware submit (defined after hook to access input/isLoading/handleSubmit/sendMessage)
+  const handleSlashSubmit = useCallback((e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const text = (input || '').trim();
+    if (!text || isLoading) return;
+
+    const slashMatch = text.match(/^\/(summary-to-doc|summary-to-skill)\b/);
+    if (slashMatch) {
+      const slashCmd = SLASH_COMMANDS[`/${slashMatch[1]}`];
+      const remaining = text.slice(slashMatch[0].length).trim();
+      const finalMsg = (remaining || '请执行此命令。') + (slashCmd?.systemReminder || '');
+      (sendMessage as any)({ text: finalMsg });
+      return;
+    }
+
+    handleSubmit(e);
+  }, [input, isLoading, handleSubmit, sendMessage]);
+
+  // =========================================================
+  // Keyboard shortcuts
+  // =========================================================
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const isMeta = e.metaKey || e.ctrlKey;
+
+      // Cmd+/ or Ctrl+/ => toggle mode
+      if (isMeta && e.key === '/') {
+        e.preventDefault();
+        setMode((m) => (m === 'agent' ? 'cmd' : 'agent'));
+      }
+
+      // Escape => dismiss interaction or cancel command
+      if (e.key === 'Escape') {
+        if (currentInteraction) {
+          dismissInteraction();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [currentInteraction, setMode, dismissInteraction]);
+
+  // =========================================================
+  // Auto-save session
+  // =========================================================
+  useEffect(() => {
+    if (messages.length > 0) {
+      const session = {
+        id: sessionId,
+        title: sessionTitle,
+        modelName: selectedModel,
+        mode,
+        assetId: activeAsset?.id,
+        assetIp: activeAsset?.ip,
+        messages: messages.map((m: any) => ({
+          id: m.id,
+          role: m.role,
+          content: getMessageText(m),
+          parts: m.parts,
+          toolInvocations: m.toolInvocations,
+          feedback: messageFeedback[m.id],
+          timestamp: m.createdAt || new Date().toISOString(),
+        })),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      ChatHistoryManager.saveSession(session);
+    }
+  }, [messages, sessionId, sessionTitle, selectedModel, mode, activeAsset, messageFeedback]);
+
+  // =========================================================
+  // Feedback handler
+  // =========================================================
+  const handleFeedback = useCallback((messageId: string, type: 'up' | 'down') => {
+    setMessageFeedback((prev) => {
+      const current = prev[messageId];
+      // Toggle if same type clicked again
+      if (current === type) {
+        const next = { ...prev };
+        delete next[messageId];
+        return next;
+      }
+      return { ...prev, [messageId]: type };
+    });
+  }, []);
+
+  return (
+    <div className="w-full h-full flex flex-col bg-[#fafafa] relative z-10">
+      {/* Header */}
+      <div className="flex items-center justify-between h-10 border-b border-zinc-200 px-3 bg-zinc-50/80">
+        <div className="flex items-center gap-2">
+          {/* History button */}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-zinc-400 hover:text-zinc-600 p-1 rounded"
+            title="聊天历史"
+          >
+            <History className="w-3.5 h-3.5" />
+          </button>
+
+          {/* Mode toggle */}
+          <div className="flex items-center bg-zinc-100 rounded-md p-0.5 text-[11px] font-medium">
+            <button
+              onClick={() => { setMode('agent'); setShowContextMenu(false); }}
+              className={`px-3 py-1 rounded transition-colors ${
+                mode === 'agent' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              }`}
+            >
+              Agent
+            </button>
+            <button
+              onClick={() => { setMode('cmd'); setShowContextMenu(false); }}
+              className={`px-3 py-1 rounded transition-colors ${
+                mode === 'cmd' ? 'bg-white text-blue-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'
+              }`}
+            >
+              Command
+            </button>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 text-zinc-500">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-md hover:bg-zinc-200/50"
+            title="安全设置"
+            onClick={() => setShowSecuritySettings(true)}
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 rounded-md hover:bg-zinc-200/50"
+            onClick={() => window.location.reload()}
+            title="新会话"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+
+      {/* History Panel */}
+      {showHistory && (
+        <div className="absolute top-10 left-0 w-64 bg-white border-r border-b border-zinc-200 rounded-br-lg shadow-lg z-20 max-h-80 overflow-y-auto">
+          <div className="px-3 py-2 border-b border-zinc-100">
+            <span className="text-xs font-semibold text-zinc-500">聊天历史</span>
+          </div>
+          {ChatHistoryManager.getSessionsPage(1).map((s) => (
+            <button
+              key={s.id}
+              className={`w-full text-left px-3 py-2 hover:bg-zinc-50 text-xs ${
+                s.id === sessionId ? 'bg-blue-50 text-blue-700' : 'text-zinc-600'
+              }`}
+            >
+              <div className="font-medium truncate">{s.title || '未命名会话'}</div>
+              <div className="text-zinc-400 text-[10px]">
+                {s.mode} · {new Date(s.updatedAt).toLocaleDateString()}
+              </div>
+            </button>
+          ))}
+          {ChatHistoryManager.getSessionsPage(1).length === 0 && (
+            <div className="px-3 py-4 text-xs text-zinc-400 text-center">暂无历史会话</div>
+          )}
+        </div>
+      )}
+
+      {/* Chat Content */}
+      <div className="flex-1 flex flex-col overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-zinc-400">
+            <div className="w-10 h-10 rounded-full border-2 border-zinc-300 flex items-center justify-center mb-3">
+              <span className="font-semibold text-lg text-zinc-400">AI</span>
+            </div>
+            <p className="text-xs">OpsinTech Agent Ready.</p>
+            <p className="text-[10px] text-zinc-300 mt-1">Cmd+/ 切换模式 · Cmd+K 聚焦输入</p>
+          </div>
+        ) : (
+          messages.map((m: any) => {
+            const textContent = getMessageText(m);
+            let reasoningText = getReasoningText(m);
+            const toolInvocations = getToolInvocations(m);
+
+            // Fallback for GPT-4o: If it put the thought in the tool's reason arg instead of content
+            if (!reasoningText && !textContent && toolInvocations.length > 0) {
+              const firstCmd = toolInvocations.find(t => t.toolName === 'execute_command');
+              if (firstCmd && firstCmd.args?.reason) {
+                 reasoningText = firstCmd.args.reason;
+              }
+            }
+
+            return (
+              <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                {/* Reasoning / Thinking (collapsible) */}
+                {m.role === 'assistant' && reasoningText && (
+                  <details className="group mb-2 w-full max-w-[95%]" open>
+                    <summary className="flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-zinc-500 cursor-pointer hover:text-zinc-700 select-none border border-zinc-200 rounded-lg bg-zinc-50/50">
+                      <ChevronDown className="w-3 h-3 transition-transform group-open:-rotate-180" />
+                      <Loader2 className="w-3 h-3 animate-spin text-zinc-400" />
+                      <span>Thinking...</span>
+                    </summary>
+                    <div className="px-3 py-2 mt-1 text-[12px] text-zinc-500 whitespace-pre-wrap border-l-2 border-zinc-200 ml-2">
+                      {reasoningText}
+                    </div>
+                  </details>
+                )}
+
+                {/* Steps Rendering */}
+                {m.role === 'assistant' && m.parts?.filter((p: any) => p.type === 'step').length > 0 && (
+                  <div className="mb-3 w-full max-w-[95%] bg-zinc-50 border border-zinc-200 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2 bg-zinc-100/50 border-b border-zinc-200 text-[11px] font-semibold text-zinc-600 flex items-center gap-2">
+                      <Bot className="w-3.5 h-3.5" />
+                      执行计划
+                    </div>
+                    <div className="p-2 flex flex-col gap-1">
+                      {m.parts.filter((p: any) => p.type === 'step').map((step: any, idx: number) => (
+                        <div key={idx} className="flex items-start gap-2 text-[12px] px-2 py-1">
+                          {step.state === 'completed' ? (
+                            <Check className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                          ) : (
+                            <Loader2 className="w-4 h-4 text-blue-500 animate-spin shrink-0 mt-0.5" />
+                          )}
+                          <span className={step.state === 'completed' ? 'text-zinc-500 line-through' : 'text-zinc-800'}>
+                            {step.stepName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* User message */}
+                {m.role === 'user' && textContent && !textContent.startsWith('[SYSTEM_INTERNAL]') && (
+                  <div className="bg-blue-600 text-white px-3 py-2 rounded-xl max-w-[90%] text-[13px] whitespace-pre-wrap">
+                    {textContent.replace(/\[SYSTEM_INTERNAL\]\s*/, '')}
+                  </div>
+                )}
+
+                {/* Assistant text with feedback */}
+                {m.role === 'assistant' && textContent && (
+                  <div className="group relative bg-white border border-zinc-200 px-3 py-2 rounded-xl max-w-[90%] text-[13px] text-zinc-800 whitespace-pre-wrap">
+                    {textContent}
+                    {/* Feedback buttons */}
+                    <div className="absolute -bottom-6 right-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        className={`p-0.5 rounded ${messageFeedback[m.id] === 'up' ? 'text-green-600 bg-green-50' : 'text-zinc-400 hover:text-green-600 hover:bg-green-50'}`}
+                        onClick={() => handleFeedback(m.id, 'up')}
+                        title="有帮助"
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        className={`p-0.5 rounded ${messageFeedback[m.id] === 'down' ? 'text-red-600 bg-red-50' : 'text-zinc-400 hover:text-red-600 hover:bg-red-50'}`}
+                        onClick={() => handleFeedback(m.id, 'down')}
+                        title="无帮助"
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tool invocations rendering */}
+                {m.role === 'assistant' && getToolInvocations(m).map((tool: any) => {
+                  const toolName = tool.toolName;
+                  // AI SDK v6 states: input-streaming / input-available / output-available / output-error
+                  const isCall = tool.state === 'input-available' || tool.state === 'input-streaming';
+                  const isDone = tool.state === 'output-available';
+                  const isError = tool.state === 'output-error';
+
+                  // ======================================================
+                  // execute_command
+                  // ======================================================
+                  if (toolName === 'execute_command') {
+                    // Agent Mode: already-processed safe commands
+                    if (mode === 'agent' && pendingDangerousTool?.toolCallId !== tool.toolCallId && !isCall) {
+                      return (
+                        <div key={tool.toolCallId} className="mt-3 flex flex-col text-left w-full max-w-[95%]">
+                          <div className="flex items-center gap-2 mb-1.5 ml-1">
+                            {!isDone && <Loader2 className="w-3.5 h-3.5 text-zinc-400 animate-spin" />}
+                            <span className="text-[12px] font-semibold text-zinc-500">Command</span>
+                          </div>
+                          <div className="bg-white rounded-md border border-zinc-200 overflow-hidden shadow-sm">
+                            <div className="px-3 py-2 text-zinc-800 text-[12px] font-mono whitespace-pre-wrap bg-zinc-50">
+                              {tool.args?.command || '(no command)'}
+                            </div>
+                            {isDone && tool.result && (
+                              <details className="group border-t border-zinc-200" open>
+                                <summary className="bg-white px-3 py-1.5 text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 hover:bg-zinc-50 cursor-pointer select-none list-none [&::-webkit-details-marker]:hidden flex items-center">
+                                  <ChevronDown className="w-3.5 h-3.5 mr-1 transition-transform group-open:-rotate-180" />
+                                  OUTPUT
+                                </summary>
+                                <div className="px-3 py-2 bg-white text-zinc-600 text-[11px] font-mono overflow-y-auto whitespace-pre-wrap max-h-96 border-t border-zinc-100">
+                                  {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+                                </div>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={tool.toolCallId} className="mt-2 flex flex-col rounded-md border border-zinc-200 overflow-hidden text-left shadow-sm w-full max-w-[95%]">
+                        <div className="bg-zinc-100 px-3 py-1.5 flex items-center justify-between border-b border-zinc-200">
+                          <span className="text-[12px] font-semibold text-zinc-700 flex items-center gap-1.5">
+                            <TerminalSquare className="w-3.5 h-3.5 text-blue-600" />
+                            {toolName === 'execute_command' ? '准备执行命令' : toolName}
+                          </span>
+                          {isDone ? (
+                            <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 border border-emerald-200/50 px-1.5 py-0.5 rounded">已执行</span>
+                          ) : isError ? (
+                            <span className="text-[11px] font-medium text-red-600 bg-red-50 border border-red-200/50 px-1.5 py-0.5 rounded">
+                              {mode === 'cmd' ? '已拒绝' : '执行失败'}
+                            </span>
+                          ) : isCommandRunning ? (
+                            <span className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-200/50 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                              <Loader2 className="w-3 h-3 animate-spin" />执行中...
+                            </span>
+                          ) : isCall && mode === 'cmd' ? (
+                            <span className="text-[11px] font-medium text-amber-600 bg-amber-50 border border-amber-200/50 px-1.5 py-0.5 rounded">等待确认</span>
+                          ) : isCall && mode === 'agent' ? (
+                            pendingDangerousTool ? (
+                              <span className="text-[11px] font-medium text-red-600 bg-red-50 border border-red-200/50 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3" />危险操作
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-medium text-blue-600 bg-blue-50 border border-blue-200/50 px-1.5 py-0.5 rounded inline-flex items-center gap-1">
+                                <Loader2 className="w-3 h-3 animate-spin" />自动执行中...
+                              </span>
+                            )
+                          ) : (
+                            <span className="text-[11px] font-medium text-zinc-500 bg-zinc-100 px-1.5 py-0.5 rounded">等待中</span>
+                          )}
+                        </div>
+                        <div className="p-3 bg-[#0d1117] text-zinc-100 text-[12px] font-mono overflow-x-auto whitespace-pre-wrap">
+                          {tool.args?.command || '(no command)'}
+                        </div>
+                        {/* Command mode action buttons */}
+                        {isCall && mode === 'cmd' && (
+                          <div className="flex bg-zinc-50 border-t border-zinc-200 p-2 gap-2 justify-end items-center">
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-zinc-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => rejectPendingCommand(tool.toolCallId, toolName)}>
+                              拒绝
+                            </Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-zinc-500 hover:text-amber-600 hover:bg-amber-50"
+                              onClick={() => executePendingCommand(tool.toolCallId, toolName, tool.args?.command || '')}
+                              title="执行此命令">
+                              自动批准
+                            </Button>
+                            <Button size="sm" className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                              onClick={() => executePendingCommand(tool.toolCallId, toolName, tool.args?.command || '')}>
+                              运行
+                            </Button>
+                          </div>
+                        )}
+                        {/* Agent mode dangerous command confirmation */}
+                        {isCall && mode === 'agent' && pendingDangerousTool && (
+                          <div className="flex flex-col border-t border-red-200">
+                            <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border-b border-red-100">
+                              <ShieldAlert className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                              <div className="text-[12px] text-red-700">
+                                <p className="font-semibold">安全警告 — 此命令被标记为危险操作</p>
+                                <p className="text-red-600 mt-0.5">原因：{pendingDangerousTool.securityResult.reason}</p>
+                                <p className="text-red-500 text-[11px] mt-0.5">
+                                  严重等级：{pendingDangerousTool.securityResult.severity === 'critical' ? '严重' : pendingDangerousTool.securityResult.severity === 'high' ? '高' : '中'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex bg-red-50/50 p-2 gap-2 justify-end items-center">
+                              <Button variant="ghost" size="sm" className="h-7 text-xs text-zinc-500 hover:text-red-600 hover:bg-red-50"
+                                onClick={() => rejectDangerousCommand()}>
+                                拒绝执行
+                              </Button>
+                              <Button size="sm" className="h-7 text-xs bg-red-600 hover:bg-red-700 text-white shadow-sm"
+                                onClick={() => confirmDangerousCommand()}>
+                                确认执行（危险）
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        {/* Output when done */}
+                        {isDone && tool.output && (
+                          <details className="group border-t border-zinc-200 bg-zinc-50">
+                            <summary className="px-3 py-1.5 text-[11px] text-zinc-500 font-medium cursor-pointer hover:text-zinc-700 hover:bg-zinc-100 flex items-center select-none list-none [&::-webkit-details-marker]:hidden">
+                              <ChevronDown className="w-3.5 h-3.5 mr-1 transition-transform group-open:-rotate-180" />
+                              执行结果
+                            </summary>
+                            <div className="px-3 py-2 bg-[#0d1117] text-zinc-300 text-[11px] font-mono overflow-y-auto whitespace-pre-wrap max-h-96">
+                              {typeof tool.output === 'string' ? tool.output : JSON.stringify(tool.output, null, 2)}
+                            </div>
+                          </details>
+                        )}
+                        {tool.errorText && (
+                          <div className="px-3 py-2 bg-red-50 text-red-700 text-[11px] font-mono border-t border-red-200">
+                            {tool.errorText}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // ======================================================
+                  // todo_write / todo_read
+                  // ======================================================
+                  if ((toolName === 'todo_write' || toolName === 'todo_read') && tool.result) {
+                    return (
+                      <div key={tool.toolCallId} className="mt-2 p-3 rounded-md border border-zinc-200 bg-white w-full max-w-[95%]">
+                        <div className="text-[12px] text-zinc-600 whitespace-pre-wrap">
+                          {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ======================================================
+                  // ask_followup_question
+                  // ======================================================
+                  if (toolName === 'ask_followup_question' && isCall) {
+                    return (
+                      <div key={tool.toolCallId} className="mt-2 p-3 rounded-md border border-blue-200 bg-blue-50/50 w-full max-w-[95%]">
+                        <p className="text-[12px] font-medium text-blue-800 mb-2">{tool.args?.question || 'Q'}</p>
+                        {tool.args?.options?.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {tool.args.options.map((opt: string, i: number) => (
+                              <button
+                                key={i}
+                                className="px-2 py-1 text-[11px] bg-white border border-zinc-200 rounded-md hover:bg-blue-50 hover:border-blue-300 text-zinc-700"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // ======================================================
+                  // Generic tool card
+                  // ======================================================
+                  return (
+                    <div key={tool.toolCallId} className="mt-2 p-2 bg-zinc-50 rounded border border-zinc-100 text-[11px] font-mono w-full max-w-[95%]">
+                      <div className="font-semibold text-zinc-600 mb-1">{toolName}</div>
+                      <div className="text-zinc-500">state: {tool.state}</div>
+                      {tool.args && <div className="text-zinc-500 truncate">args: {JSON.stringify(tool.args)}</div>}
+                      {tool.result && (
+                        <details className="mt-1 group border border-zinc-200 rounded-md bg-white">
+                          <summary className="px-2 py-1 text-[11px] text-zinc-500 font-medium cursor-pointer hover:bg-zinc-50 flex items-center select-none list-none [&::-webkit-details-marker]:hidden">
+                            <ChevronDown className="w-3.5 h-3.5 mr-1 transition-transform group-open:-rotate-180" />
+                            output
+                          </summary>
+                          <div className="p-2 border-t border-zinc-200 text-zinc-500 font-mono overflow-y-auto whitespace-pre-wrap max-h-48 bg-zinc-50">
+                            {typeof tool.result === 'string' ? tool.result : JSON.stringify(tool.result, null, 2)}
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {m.role === 'assistant' && !textContent && getToolInvocations(m).length === 0 && isLoading && (
+                  <div className="flex items-center gap-2 text-zinc-400 text-xs px-3 py-2">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Thinking...</span>
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+
+        {isLoading && messages.length === 0 && (
+          <div className="flex items-center gap-2 text-zinc-400 text-xs">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>Agent is typing...</span>
+          </div>
+        )}
+
+        {isDetectingInteraction && (
+          <div className="flex items-center gap-2 text-blue-500 text-xs">
+            <Loader2 className="w-3 h-3 animate-spin text-blue-500" />
+            <span>检测交互中...</span>
+          </div>
+        )}
+
+        {/* Interaction prompt */}
+        {currentInteraction && (
+          <CommandInteractionInput
+            state={{
+              commandId: currentInteraction.commandId,
+              interactionType: (currentInteraction.interactionType as any) || 'freeform',
+              promptHint: currentInteraction.promptHint || '',
+              options: currentInteraction.options || [],
+              optionValues: currentInteraction.optionValues || [],
+              confirmValues: currentInteraction.confirmValues as any,
+              exitKey: currentInteraction.exitKey,
+              exitAppendNewline: currentInteraction.exitAppendNewline,
+              isSuppressed: false,
+              tuiDetected: false,
+              tuiMessage: '',
+              errorMessage: '',
+              isSubmitting: false,
+            }}
+            onSubmit={({ commandId, input, appendNewline, interactionType }) => {
+              submitInteraction({ commandId, input, appendNewline, interactionType: interactionType as any });
+            }}
+            onCancel={() => cancelCommand()}
+            onDismiss={() => dismissInteraction()}
+            onSuppress={() => suppressInteraction()}
+            onUnsuppress={() => {}}
+            onFocusTerminal={() => {}}
+            onClearError={() => {}}
+          />
+        )}
+      </div>
+
+      {/* Chat Input */}
+      <div className="p-4">
+        <form
+          onSubmit={handleSlashSubmit}
+          className="bg-white border border-zinc-200 rounded-xl shadow-sm flex flex-col overflow-hidden focus-within:border-blue-400 focus-within:ring-1 focus-within:ring-blue-400/20 transition-all"
+        >
+          {/* Context indicator */}
+          <div className="px-3 pt-3 flex items-center gap-2 flex-wrap">
+            {mode === 'cmd' ? (
+              <div className="inline-flex items-center gap-1.5 bg-zinc-100 text-zinc-600 text-[11px] px-2 py-1 rounded-md font-medium border border-zinc-200">
+                <Monitor className="w-3 h-3" />
+                {activeAsset ? `${activeAsset.ip}` : 'localhost'}
+              </div>
+            ) : selectedAgentAsset ? (
+              <div className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-600 text-[11px] px-2 py-1 rounded-md font-medium border border-blue-100">
+                <span className="text-blue-400 font-bold">@</span>
+                <Monitor className="w-3 h-3" />
+                {selectedAgentAsset.ip}
+                <button onClick={() => setSelectedAgentAsset(null)} className="ml-1 text-blue-400 hover:text-blue-600"><X className="w-3 h-3" /></button>
+              </div>
+            ) : null}
+
+            <div className="relative">
+              <button 
+                type="button" 
+                onClick={() => setShowContextMenu(!showContextMenu)}
+                className="inline-flex items-center gap-1 bg-zinc-100 hover:bg-zinc-200 text-zinc-600 text-[11px] px-2 py-1 rounded-md font-medium border border-zinc-200 transition-colors"
+              >
+                <span className="font-bold">@</span> 添加上下文
+              </button>
+              {showContextMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowContextMenu(false)}></div>
+                  <div className="absolute left-0 bottom-full mb-1 w-64 p-2 text-sm shadow-xl rounded-xl bg-white border border-zinc-200 z-20">
+                    <div className="mb-2">
+                      <input 
+                        autoFocus
+                        type="text" 
+                        placeholder="搜索" 
+                        value={contextMenuSearch}
+                        onChange={e => setContextMenuSearch(e.target.value)}
+                        className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-100"
+                      />
+                    </div>
+                    <div className="flex flex-col space-y-0.5">
+                      {mode === 'agent' && (
+                        <div className="flex flex-col group">
+                          <div className="px-2 py-1.5 text-xs font-medium text-zinc-700 flex items-center gap-2 rounded-md hover:bg-zinc-100 cursor-pointer">
+                            <Monitor className="w-4 h-4 text-zinc-500" />
+                            主机
+                            <ChevronLeft className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 rotate-180 transition-transform" />
+                          </div>
+                          <div className="pl-6 flex flex-col mt-1 hidden group-hover:flex max-h-32 overflow-y-auto">
+                            {assets.filter(a => a.ip.includes(contextMenuSearch)).slice(0, 5).map(a => (
+                              <div 
+                                key={a.id} 
+                                onClick={() => { setSelectedAgentAsset(a); setShowContextMenu(false); }}
+                                className="px-2 py-1 text-[11px] text-zinc-600 hover:bg-blue-50 hover:text-blue-600 rounded cursor-pointer truncate"
+                              >
+                                {a.ip} {a.hostname ? `(${a.hostname})` : ''}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div className="px-2 py-1.5 text-xs font-medium text-zinc-700 flex items-center gap-2 rounded-md hover:bg-zinc-100 cursor-pointer">
+                        <History className="w-4 h-4 text-zinc-500" />知识库
+                      </div>
+                      <div className="px-2 py-1.5 text-xs font-medium text-zinc-700 flex items-center gap-2 rounded-md hover:bg-zinc-100 cursor-pointer">
+                        <Settings className="w-4 h-4 text-zinc-500" />Skills
+                      </div>
+                      <div className="px-2 py-1.5 text-xs font-medium text-zinc-700 flex items-center gap-2 rounded-md hover:bg-zinc-100 cursor-pointer">
+                        <History className="w-4 h-4 text-zinc-500" />历史对话
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <textarea
+            value={input || ''}
+            onChange={handleInputChange}
+            disabled={models.length === 0 || isLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e as any);
+              }
+            }}
+            placeholder={
+              models.length === 0
+                ? '未配置任何模型，请先添加模型'
+                : activeAsset
+                ? `在 ${activeAsset.ip} 上执行命令... /summary-to-doc 总结文档 · Cmd+/ 切换模式`
+                : '请先在左侧选择一个主机建立 SSH 连接'
+            }
+            className="w-full bg-transparent border-0 resize-none px-4 py-2.5 text-[13px] text-zinc-800 placeholder:text-zinc-400 disabled:opacity-50 focus:outline-none focus:ring-0 min-h-[60px]"
+          />
+
+          {/* Bottom bar */}
+          <div className="flex items-center justify-between px-3 py-2 bg-white border-t border-zinc-100/50">
+            <div className="flex items-center gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="flex items-center gap-1 text-[11px] font-medium text-zinc-600 hover:text-zinc-900">
+                    {selectedModel}
+                    <ChevronDown className="w-3 h-3 text-zinc-400" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="text-[12px]">
+                  {models.map((m) => (
+                    <DropdownMenuItem key={m.name} onClick={() => setSelectedModel(m.name)}>
+                      {m.display_name || m.name}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button type="button" className="text-zinc-400 hover:text-zinc-600 transition-colors p-1" title="上传图片">
+                <ImageIcon className="w-4 h-4" />
+              </button>
+              <button type="button" className="text-zinc-400 hover:text-zinc-600 transition-colors p-1" disabled={models.length === 0} title="语音输入">
+                <Mic className="w-4 h-4" />
+              </button>
+              <Button
+                type="submit"
+                size="icon"
+                disabled={!input?.trim() || isLoading || models.length === 0}
+                className="h-7 w-7 rounded-full bg-blue-500 hover:bg-blue-600 text-white shadow-sm ml-1"
+              >
+                <ArrowUp className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* Security Settings Panel */}
+      <SecuritySettingsPanel open={showSecuritySettings} onClose={() => setShowSecuritySettings(false)} />
+    </div>
+  );
+}
