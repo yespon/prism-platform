@@ -143,6 +143,7 @@ export interface Translations {
     auditGovernance: string;
     systemSettings: string;
     incidents: string;
+    skillsPlaza: string;
   };
 
   // Agents
@@ -292,6 +293,7 @@ export interface Translations {
     summarizationsCount: (count: number) => string;
     triggerProgress: string;
     triggerThreshold: string;
+    contextWarning: string;
   };
 
   // Nav Menu (sidebar user dropdown)
@@ -941,6 +943,7 @@ export interface Translations {
       user: string;
       modelLifecycle: string;
       memory: string;
+      summarization: string;
       tools: string;
       skills: string;
       notification: string;
@@ -979,6 +982,20 @@ export interface Translations {
           view: string;
         };
       };
+    };
+    summarization: {
+      title: string;
+      description: string;
+      enabled: string;
+      enabledDescription: string;
+      triggerTokens: string;
+      triggerTokensDescription: string;
+      triggerMessages: string;
+      triggerMessagesDescription: string;
+      keepMessages: string;
+      keepMessagesDescription: string;
+      trimTokens: string;
+      trimTokensDescription: string;
     };
     appearance: {
       themeTitle: string;

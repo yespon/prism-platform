@@ -1,0 +1,181 @@
+import json
+import logging
+import traceback
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
+from langchain_core.messages import HumanMessage
+from langgraph.types import Command
+from pydantic import BaseModel
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from app.agent.terminal_graph import terminal_graph, MAX_ITERATIONS
+from app.gateway.authorization import require_tenant_context
+from deerflow.database.session import get_session
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter()
+
+
+class AgentInvokeRequest(BaseModel):
+    session_id: str
+    asset_id: str = ""
+    terminal_session_id: str = ""
+    model_name: str = "gpt-4o"
+    mode: str = "cmd"
+    user_input: str
+    selected_assets: list[dict] = []
+
+
+class AgentApproveRequest(BaseModel):
+    session_id: str
+    tool_call_id: str
+    approved: bool
+
+
+def _sse(payload: dict) -> str:
+    """Format a dict as an SSE data event."""
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+@router.post("/invoke")
+async def invoke_agent(
+    req: AgentInvokeRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Invoke the terminal agent graph using Server-Sent Events (SSE).
+    
+    Streams AG-UI protocol events to the frontend.
+    """
+    tenant_id = require_tenant_context(request)
+    user_id = getattr(request.state, "user_id", "unknown")
+
+    async def event_generator():
+        # Use first selected asset if asset_id is empty (Agent mode multi-host)
+        effective_asset_id = req.asset_id
+        if not effective_asset_id and req.selected_assets:
+            effective_asset_id = req.selected_assets[0].get("id", "")
+
+        state_update = {
+            "session_id": req.session_id,
+            "terminal_session_id": req.terminal_session_id or req.session_id,
+            "asset_id": effective_asset_id,
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "mode": req.mode,
+            "model_name": req.model_name,
+            "messages": [HumanMessage(content=req.user_input)],
+        }
+        config = {"configurable": {"thread_id": req.session_id}}
+
+        try:
+            from app.alerting.diagnosis_sse import (
+                StreamState,
+                parse_messages_tuple_event,
+                parse_values_event,
+                msg_thread,
+                msg_done,
+                msg_error,
+                _tool_approval_required,
+            )
+
+            stream_state = StreamState()
+
+            # Lifecycle: run started
+            yield msg_thread(req.session_id, "Terminal Agent")
+            
+            logger.info(f"[agent_terminal] Starting graph stream for session={req.session_id} mode={req.mode}")
+
+            # Stream with both "messages" and "values" modes
+            # "messages" gives us delta chunks; "values" gives us full state snapshots
+            async for mode, chunk in terminal_graph.astream(
+                state_update, config, stream_mode=["messages", "values"]
+            ):
+                if mode == "messages":
+                    agui_events = parse_messages_tuple_event(chunk, stream_state)
+                    for sse in agui_events:
+                        yield sse
+                elif mode == "values":
+                    agui_events = parse_values_event(chunk, stream_state)
+                    for sse in agui_events:
+                        yield sse
+
+            # After streaming, check if the graph is waiting for approval
+            graph_state = terminal_graph.get_state(config)
+            if graph_state and graph_state.next and "ask_approval" in graph_state.next:
+                # Graph is paused at ask_approval — extract pending tool calls
+                pending = graph_state.values.get("pending_tool_calls", [])
+                if pending:
+                    yield _tool_approval_required(pending)
+                    logger.info(f"[agent_terminal] Approval required for {len(pending)} tool(s)")
+
+            # Lifecycle: run finished
+            yield msg_done(req.session_id)
+            logger.info(f"[agent_terminal] Graph stream completed for session={req.session_id}")
+
+        except Exception as e:
+            logger.error(f"[agent_terminal] Graph error: {e}")
+            traceback.print_exc()
+            yield msg_error(str(e))
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.post("/approve")
+async def approve_tool(
+    req: AgentApproveRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_session),
+):
+    """
+    Approve or reject a pending tool call (Human-in-the-Loop).
+    
+    Resumes the graph from the interrupt point with the user's decision.
+    """
+    config = {"configurable": {"thread_id": req.session_id}}
+
+    async def event_generator():
+        try:
+            from app.alerting.diagnosis_sse import (
+                StreamState,
+                parse_messages_tuple_event,
+                parse_values_event,
+                msg_done,
+                msg_error,
+            )
+
+            stream_state = StreamState()
+
+            # Resume the graph with approval decision
+            resume_value = Command(resume={"approved": req.approved, "tool_call_id": req.tool_call_id})
+            
+            logger.info(f"[agent_terminal] Resuming graph with approval={req.approved} for session={req.session_id}")
+            
+            async for mode, chunk in terminal_graph.astream(
+                resume_value, config, stream_mode=["messages", "values"]
+            ):
+                if mode == "messages":
+                    agui_events = parse_messages_tuple_event(chunk, stream_state)
+                    for sse in agui_events:
+                        yield sse
+                elif mode == "values":
+                    agui_events = parse_values_event(chunk, stream_state)
+                    for sse in agui_events:
+                        yield sse
+
+            close_evt = stream_state.close_text_message()
+            if close_evt:
+                yield close_evt
+
+            yield msg_done(req.session_id)
+            logger.info(f"[agent_terminal] Approval resume completed for session={req.session_id}")
+
+        except Exception as e:
+            logger.error(f"[agent_terminal] Approval error: {e}")
+            traceback.print_exc()
+            yield msg_error(str(e))
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

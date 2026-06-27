@@ -1,6 +1,6 @@
 "use client";
 
-import { BotIcon, PlusIcon, SearchIcon, RotateCwIcon } from "lucide-react";
+import { BotIcon, PlusIcon, SearchIcon, RotateCwIcon, Settings2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -13,11 +13,15 @@ import { useI18n } from "@/core/i18n/hooks";
 import { AgentCard } from "./agent-card";
 import { CreateAgentDialog } from "./create-agent-dialog";
 import { EditAgentDialog } from "./edit-agent-dialog";
+import { SummarizationSettingsPage } from "@/components/workspace/settings/summarization-settings-page";
 
 export function AgentGallery() {
   const { t } = useI18n();
   const { agents, isLoading, refetch } = useAgents();
   const router = useRouter();
+
+  // Tab state: "agents" | "summarization"
+  const [activeTab, setActiveTab] = useState<"agents" | "summarization">("agents");
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState("");
@@ -69,6 +73,43 @@ export function AgentGallery() {
           </p>
         </div>
       </div>
+
+      {/* Tab bar */}
+      <div className="flex shrink-0 items-center gap-1 border-b border-border/60 pb-0">
+        <button
+          onClick={() => setActiveTab("agents")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[1px] ${
+            activeTab === "agents"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <BotIcon className="inline-block h-4 w-4 mr-1.5" />
+          智能体列表
+        </button>
+        <button
+          onClick={() => setActiveTab("summarization")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-[1px] ${
+            activeTab === "summarization"
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Settings2Icon className="inline-block h-4 w-4 mr-1.5" />
+          上下文压缩
+        </button>
+      </div>
+
+      {/* Summarization settings tab */}
+      {activeTab === "summarization" && (
+        <div className="flex-1 overflow-y-auto min-h-0 pt-2">
+          <SummarizationSettingsPage />
+        </div>
+      )}
+
+      {/* Agent list tab */}
+      {activeTab === "agents" && (
+        <>
 
       {/* Filter and Search Bar directly below the header */}
       <div className="border border-border/85 rounded-lg bg-card px-6 py-3.5 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm shrink-0">
@@ -172,6 +213,9 @@ export function AgentGallery() {
         }}
         onSuccess={refetch}
       />
+
+        </>
+      )}
     </div>
   );
 }

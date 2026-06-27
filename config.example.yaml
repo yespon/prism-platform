@@ -72,33 +72,6 @@ title:
   model_name: null
 
 # ============================================================================
-# Summarization Configuration
-# ============================================================================
-# Automatically summarize conversation history when token limits are approached
-# This helps maintain context in long conversations without exceeding model limits
-
-summarization:
-  enabled: true
-
-  # Model to use for summarization (null = use default model)
-  model_name: null
-
-  trigger:
-    - type: tokens
-      value: 12000
-
-  keep:
-    type: messages
-    value: 5
-    # type: tokens
-    # value: 3000
-    # type: fraction
-    # value: 0.3
-
-  trim_tokens_to_summarize: 8000
-  summary_prompt: null
-
-# ============================================================================
 # Memory Configuration
 # ============================================================================
 # Global memory mechanism

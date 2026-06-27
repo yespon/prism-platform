@@ -178,6 +178,132 @@ export async function analyzeIncident(incidentId: string): Promise<{ status: str
   return json as { status: string; incident_id: string };
 }
 
+export async function claimIncident(incidentId: string): Promise<{ status: string; incident_id: string; owner_user_id: string }> {
+  const response = await fetchAuthApi(`/api/incidents/${encodeURIComponent(incidentId)}/claim`, {
+    method: "POST",
+  });
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "认领告警失败"));
+  }
+
+  return json as { status: string; incident_id: string; owner_user_id: string };
+}
+
+export async function assignIncident(incidentId: string, ownerUserId: string): Promise<{ status: string; incident_id: string; owner_user_id: string }> {
+  const response = await fetchAuthApi(`/api/incidents/${encodeURIComponent(incidentId)}/assign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ owner_user_id: ownerUserId }),
+  });
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "指派告警失败"));
+  }
+
+  return json as { status: string; incident_id: string; owner_user_id: string };
+}
+
+export async function resolveIncident(incidentId: string, resolutionNote?: string): Promise<{ status: string; incident_id: string }> {
+  const response = await fetchAuthApi(`/api/incidents/${encodeURIComponent(incidentId)}/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ resolution_note: resolutionNote || null }),
+  });
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "恢复告警失败"));
+  }
+
+  return json as { status: string; incident_id: string };
+}
+
+export async function createTicket(incidentId: string): Promise<{ ticket_id: string; ticket_url: string | null; provider: string; incident_id: string }> {
+  const response = await fetchAuthApi(`/api/incidents/${encodeURIComponent(incidentId)}/ticket`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "webhook" }),
+  });
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "创建工单失败"));
+  }
+
+  return json as { ticket_id: string; ticket_url: string | null; provider: string; incident_id: string };
+}
+
+export async function getIncidentTimeline(incidentId: string): Promise<Array<{ type: string; timestamp: string; title: string; detail: string | null; actor: string | null; metadata: Record<string, unknown> | null }>> {
+  const response = await fetchAuthApi(`/api/incidents/${encodeURIComponent(incidentId)}/timeline`);
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "加载事件时间线失败"));
+  }
+
+  return json as Array<{ type: string; timestamp: string; title: string; detail: string | null; actor: string | null; metadata: Record<string, unknown> | null }>;
+}
+
+export interface IncidentStatsSummary {
+  total_firing: number;
+  total_resolved: number;
+  total_suppressed: number;
+  severity_distribution: Record<string, number>;
+  mttr_minutes: number | null;
+  mtta_minutes: number | null;
+  recent_trend: Array<{ date: string; count: number }>;
+}
+
+export async function getIncidentStatsSummary(): Promise<IncidentStatsSummary> {
+  const response = await fetchAuthApi("/api/incidents/stats/summary");
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "加载仪表盘数据失败"));
+  }
+
+  return json as IncidentStatsSummary;
+}
+
+export interface SourceHealthItem {
+  source_id: string;
+  source_name: string;
+  source_type: string;
+  status: string;
+  last_received_at: string | null;
+  total_received_24h: number;
+  total_errors_24h: number;
+  health: string; // healthy, warning, error, unknown
+}
+
+export async function getSourceHealth(): Promise<SourceHealthItem[]> {
+  const response = await fetchAuthApi("/api/alert-sources/health");
+
+  let json: unknown = null;
+  try { json = await response.json(); } catch { json = null; }
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(json, "加载告警源健康状态失败"));
+  }
+
+  return json as SourceHealthItem[];
+}
+
 
 
 export async function listAlertSources(): Promise<AlertSource[]> {

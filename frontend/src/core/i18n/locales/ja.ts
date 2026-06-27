@@ -197,6 +197,7 @@ export const ja: Translations = {
     auditGovernance: "監査とガバナンス",
     systemSettings: "システム設定",
     incidents: "アラート",
+    skillsPlaza: "スキルプラザ",
   },
 
   // Agents
@@ -350,11 +351,12 @@ export const ja: Translations = {
 
   // Summary Status (token usage & trigger progress)
   summaryStatus: {
-    summarizations: "要約",
+    summarizations: "サマリー",
     summarizationsCount: (count: number) =>
-      `${count}回の要約`,
-    triggerProgress: "トリガー進捗",
+      `${count}件のサマリー`,
+    triggerProgress: "トリガー進行状況",
     triggerThreshold: "トリガーしきい値",
+    contextWarning: "コンテキスト使用率が高いです。最適なパフォーマンスのために新しいセッションを開始することをお勧めします。",
   },
 
   // Shortcuts
@@ -1005,6 +1007,7 @@ export const ja: Translations = {
       user: "ユーザー",
       modelLifecycle: "モデルライフサイクル",
       memory: "メモリー",
+      summarization: "コンテキスト圧縮",
       tools: "ツール",
       skills: "スキル",
       notification: "通知",
@@ -1044,6 +1047,25 @@ export const ja: Translations = {
           view: "表示",
         },
       },
+    },
+    summarization: {
+      title: "コンテキスト圧縮",
+      description:
+        "会話履歴がモデルのコンテキスト制限に近づいたときに、自動的に以前の会話を要約圧縮します。適切な設定によりコンテキストオーバーフローエラーを防ぎ、会話の一貫性を維持します。",
+      enabled: "自動圧縮を有効化",
+      enabledDescription: "有効にすると、トークン数またはメッセージ数がしきい値に達したときに会話履歴を自動的に圧縮します。",
+      triggerTokens: "トークントリガーしきい値",
+      triggerTokensDescription:
+        "会話トークン数がこの値に達すると圧縮がトリガーされます。モデルのコンテキストウィンドウに基づいて自動調整されます（推奨: 10000-20000）。",
+      triggerMessages: "メッセージトリガーしきい値",
+      triggerMessagesDescription:
+        "メッセージ数がこの値に達すると圧縮がトリガーされます。補助的な保護措置として機能します。",
+      keepMessages: "保持するメッセージ数",
+      keepMessagesDescription:
+        "圧縮後に保持する最近の完全なメッセージ数。最新の会話コンテキストを失わないようにします。",
+      trimTokens: "要約コンテキスト上限",
+      trimTokensDescription:
+        "要約モデルに送信する会話履歴の最大トークン数。この値を超える履歴は要約生成前に切り詰められます。",
     },
     appearance: {
       themeTitle: "テーマ",

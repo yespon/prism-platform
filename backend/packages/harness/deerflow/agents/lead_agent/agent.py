@@ -116,6 +116,12 @@ def make_lead_agent(config):
         tenant_allowed_model_names = set(load_enabled_tenant_model_names(tenant_id.strip()))
 
     with tenant_context(user_id=user_id, tenant_id=tenant_id):
+        # ------------------------------------------------------------------
+        # Built-in Terminal Agent (SSH-based remote host operations)
+        # ------------------------------------------------------------------
+        if agent_name == "terminal-agent":
+            return _make_terminal_agent(config)
+
         agent_config = load_agent_config(agent_name, user_id=user_id) if not is_bootstrap else None
         agent_model_name = agent_config.model if agent_config and agent_config.model else None
 
@@ -191,3 +197,53 @@ def make_lead_agent(config):
             ),
             state_schema=ThreadState,
         )
+
+
+def _make_terminal_agent(config: dict):
+    """Build the built-in terminal agent for SSH-based remote host operations.
+
+    Injects terminal-specific tools (execute_command, read_file, write_file,
+    grep_search, web_fetch) and the terminal system prompt.
+    """
+    from app.agent.terminal_tools import get_terminal_tools, set_terminal_context
+    from app.agent.prompts import TERMINAL_AGENT_SYSTEM_PROMPT
+
+    cfg = config.get("configurable", {})
+    runtime_context = config.get("context", {}) or cfg  # LangGraph SDK puts context values into configurable
+
+    is_bootstrap = cfg.get("is_bootstrap", runtime_context.get("is_bootstrap", False))
+
+    # Extract terminal-specific context from the request
+    terminal_context = {
+        "mode": runtime_context.get("mode", "agent"),
+        "selected_assets": runtime_context.get("selected_assets", []),
+        "terminal_session_id": runtime_context.get("terminal_session_id", ""),
+        "tenant_id": runtime_context.get("tenant_id", "default"),
+        "user_id": runtime_context.get("user_id", "unknown"),
+    }
+    logger.info(f"[_make_terminal_agent] selected_assets: {len(terminal_context['selected_assets'])}, mode: {terminal_context['mode']}")
+    set_terminal_context(terminal_context)
+
+    # Resolve model
+    requested_model_name = (
+        cfg.get("model_name")
+        or cfg.get("model")
+        or runtime_context.get("model_name")
+        or runtime_context.get("model")
+    )
+    model_name = _resolve_model_name(requested_model_name or None)
+
+    # Build the agent
+    from deerflow.tools.builtins import setup_agent
+
+    tools = get_terminal_tools()
+    if is_bootstrap:
+        tools = tools + [setup_agent]
+
+    return create_agent(
+        model=create_chat_model(name=model_name),
+        tools=tools,
+        middleware=[],
+        system_prompt=TERMINAL_AGENT_SYSTEM_PROMPT,
+        state_schema=ThreadState,
+    )

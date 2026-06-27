@@ -9,6 +9,12 @@
 
 set -e
 
+# ── Unset invalid SSL_CERT_FILE to prevent Python startup crashes ──────────────
+if [ -n "${SSL_CERT_FILE:-}" ] && [ ! -f "$SSL_CERT_FILE" ]; then
+    echo "⚠ SSL_CERT_FILE is set to '$SSL_CERT_FILE' but the file does not exist. Unsetting it to prevent Python SSL crashes."
+    unset SSL_CERT_FILE
+fi
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 

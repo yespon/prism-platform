@@ -113,6 +113,20 @@ def _tool_call_result(tool_call_id: str, content: str, is_error: bool = False) -
     return _sse(payload)
 
 
+def _tool_approval_required(tool_calls: list[dict[str, Any]]) -> str:
+    """Notify frontend that one or more tool calls need user approval (Agent mode HITL)."""
+    return _sse({
+        "type": "TOOL_APPROVAL_REQUIRED",
+        "toolCalls": [
+            {
+                "toolCallId": tc.get("tool_call_id") or tc.get("id", ""),
+                "toolName": tc.get("tool_name") or tc.get("name", ""),
+            }
+            for tc in tool_calls
+        ],
+    })
+
+
 # ---------------------------------------------------------------------------
 # Step events
 # ---------------------------------------------------------------------------
@@ -158,6 +172,8 @@ def _clarification_response(message_id: str, response: str) -> str:
 class StreamState:
     """Tracks message & tool-call lifecycle across LangGraph stream chunks."""
 
+    session_prefix: str = field(default_factory=lambda: __import__("uuid").uuid4().hex[:6])
+
     # Text message tracking
     text_message_open: bool = False
     text_message_id: str | None = None
@@ -176,7 +192,7 @@ class StreamState:
 
     def next_text_message_id(self) -> str:
         self.text_message_counter += 1
-        return f"txt-{self.text_message_counter}"
+        return f"txt-{self.session_prefix}-{self.text_message_counter}"
 
     def open_text_message(self) -> tuple[str, str]:
         """Open a new text message. Returns (message_id, SSE start event)."""
@@ -241,8 +257,12 @@ def parse_messages_tuple_event(data: Any, state: StreamState) -> list[str]:
                     inner = item[0]
             if isinstance(inner, (list, tuple)) and len(inner) >= 2:
                 inner = inner[1]
+            if hasattr(inner, "dict") and callable(inner.dict):
+                inner = inner.dict()
             if isinstance(inner, dict):
                 messages.append(inner)
+    elif hasattr(data, "dict") and callable(data.dict):
+        messages.append(data.dict())
     elif isinstance(data, dict):
         messages.append(data)
 
@@ -250,12 +270,14 @@ def parse_messages_tuple_event(data: Any, state: StreamState) -> list[str]:
         msg_type = str(msg.get("type", "")).lower()
         content = msg.get("content")
         tool_call_chunks: list[dict[str, Any]] = msg.get("tool_call_chunks", []) or []
+        if not tool_call_chunks:
+            tool_call_chunks = msg.get("tool_calls", []) or []
 
         # ---- AI message chunk ----
         if "ai" in msg_type and "tool" not in msg_type:
             # Check for thinking/reasoning content
             if "thinking" in msg_type or "reasoning" in msg_type:
-                think_id = f"think-{state.text_message_counter + 1}"
+                think_id = f"think-{state.session_prefix}-{state.text_message_counter + 1}"
                 text = _extract_text(content) if content else ""
                 results.append(_thinking_start(think_id))
                 if text:
@@ -281,7 +303,7 @@ def parse_messages_tuple_event(data: Any, state: StreamState) -> list[str]:
                     block_type = block.get("type", "")
                     block_text = block.get("text", "") or ""
                     if block_type in ("thinking", "reasoning"):
-                        think_id = f"think-{state.text_message_counter + 1}"
+                        think_id = f"think-{state.session_prefix}-{state.text_message_counter + 1}"
                         results.append(_thinking_start(think_id))
                         if block_text:
                             results.append(_thinking_content(think_id, block_text))
@@ -314,7 +336,7 @@ def parse_messages_tuple_event(data: Any, state: StreamState) -> list[str]:
 
             # Finish: response ended
             finish_reason = (msg.get("response_metadata") or {}).get("finish_reason", "")
-            if finish_reason in ("stop", "end_turn"):
+            if finish_reason in ("stop", "end_turn", "tool_calls"):
                 if state.active_tool_call_id:
                     results.append(_tool_call_end(state.active_tool_call_id))
                     state.active_tool_call_id = None
