@@ -10,6 +10,8 @@ export interface Model {
   supports_text2image?: boolean;
   enabled?: boolean;
   model_type?: string | null;
+  /** Maximum input tokens (context window) for this model. Used for summarization threshold calculation. */
+  max_input_tokens?: number | null;
 }
 
 export interface RegisterModelInput {

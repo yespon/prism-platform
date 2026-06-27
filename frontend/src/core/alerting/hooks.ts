@@ -18,11 +18,17 @@ import {
   unsuppressIncident,
   analyzeIncident,
   cancelDiagnosis,
+  claimIncident,
+  assignIncident,
+  resolveIncident,
+  createTicket,
   updateAlertRule,
   updateAlertSource,
   getAlertingSettings,
   updateAlertingSettings,
   getIncidentStats,
+  getIncidentStatsSummary,
+  getSourceHealth,
   getChannelsStatus,
   testNotification,
   type ListIncidentsParams,
@@ -126,6 +132,87 @@ export function useCancelDiagnosis() {
   });
 }
 
+export function useClaimIncident() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (incidentId: string) => claimIncident(incidentId),
+    onSuccess: (data, incidentId) => {
+      toast.success("已认领该告警事件");
+      void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["incidents", "detail", { incidentId }],
+        exact: false,
+      });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "认领告警失败，请重试");
+    },
+  });
+}
+
+export function useAssignIncident() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ incidentId, ownerUserId }: { incidentId: string; ownerUserId: string }) =>
+      assignIncident(incidentId, ownerUserId),
+    onSuccess: (data, variables) => {
+      toast.success("已指派告警事件");
+      void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["incidents", "detail", { incidentId: variables.incidentId }],
+        exact: false,
+      });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "指派告警失败，请重试");
+    },
+  });
+}
+
+export function useResolveIncident() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ incidentId, note }: { incidentId: string; note?: string }) =>
+      resolveIncident(incidentId, note),
+    onSuccess: (data, variables) => {
+      toast.success("告警事件已标记为已恢复");
+      void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["incidents", "detail", { incidentId: variables.incidentId }],
+        exact: false,
+      });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "恢复告警失败，请重试");
+    },
+  });
+}
+
+export function useCreateTicket() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (incidentId: string) => createTicket(incidentId),
+    onSuccess: (data, incidentId) => {
+      toast.success(`工单已创建${data.ticket_url ? "，点击查看" : ""}`);
+      if (data.ticket_url) {
+        window.open(data.ticket_url, "_blank");
+      }
+      void queryClient.invalidateQueries({ queryKey: ["incidents"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["incidents", "detail", { incidentId }],
+        exact: false,
+      });
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "创建工单失败，请重试");
+    },
+  });
+}
+
 export function useAlertSources() {
   const { data: currentTenant } = useCurrentTenant();
   const tenantId = currentTenant?.tenant_id ?? null;
@@ -135,6 +222,19 @@ export function useAlertSources() {
     queryFn: listAlertSources,
     enabled: !!tenantId,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useSourceHealth() {
+  const { data: currentTenant } = useCurrentTenant();
+  const tenantId = currentTenant?.tenant_id ?? null;
+
+  return useQuery({
+    queryKey: ["alertSources", "health", { tenantId }],
+    queryFn: () => getSourceHealth(),
+    enabled: !!tenantId,
+    refetchInterval: 60_000, // auto-refresh every 1 minute
+    staleTime: 30_000,
   });
 }
 
@@ -277,12 +377,12 @@ export function useIncidentStats() {
   const { data: currentTenant } = useCurrentTenant();
   const tenantId = currentTenant?.tenant_id ?? null;
 
-  return useQuery<IncidentStats>({
-    queryKey: ["incidents", "stats", { tenantId }],
-    queryFn: getIncidentStats,
+  return useQuery({
+    queryKey: ["incidents", "stats", "summary", { tenantId }],
+    queryFn: () => getIncidentStatsSummary(),
     enabled: !!tenantId,
-    refetchOnWindowFocus: false,
-    staleTime: 5000,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 }
 

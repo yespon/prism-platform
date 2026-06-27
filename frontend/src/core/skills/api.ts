@@ -273,7 +273,7 @@ export async function deleteTenantSkill(skillName: string) {
 
 export async function getSkillDetail(skillName: string) {
   const response = await fetch(
-    `${getBackendBaseURL()}/api/tenants/skills/${skillName}/detail`,
+    `${getBackendBaseURL()}/api/skills/${skillName}/detail`,
     {
       headers: await getAuthHeaders(),
     }
@@ -284,7 +284,7 @@ export async function getSkillDetail(skillName: string) {
   return response.json();
 }
 
-export async function generateInstructions(prompt: string) {
+export async function generateInstructions(prompt: string, modelName?: string) {
   const response = await fetch(
     `${getBackendBaseURL()}/api/skills/generate-instructions`,
     {
@@ -292,7 +292,7 @@ export async function generateInstructions(prompt: string) {
       headers: await getAuthHeaders({
         "Content-Type": "application/json",
       }),
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, model_name: modelName }),
     }
   );
   if (!response.ok) {

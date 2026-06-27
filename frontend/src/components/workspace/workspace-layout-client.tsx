@@ -8,6 +8,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { ChatTabsProvider } from "@/components/workspace/chats/chat-tabs-context";
 import { CommandPalette } from "@/components/workspace/command-palette";
 import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
+import { PersistentTerminal } from "@/components/workspace/terminal/persistent-terminal";
 import { getLocalSettings, useLocalSettings } from "@/core/settings";
 import { bootstrapTenantContext, useTenantList } from "@/core/tenants";
 import { isRateLimitLikeError } from "@/core/threads/hooks";
@@ -116,8 +117,11 @@ export function WorkspaceLayoutClient({
         onOpenChange={handleOpenChange}
       >
         <WorkspaceSidebar />
-          <SidebarInset className="min-w-0">
-            <ChatTabsProvider>{children}</ChatTabsProvider>
+          <SidebarInset className="min-w-0 flex flex-col h-full relative">
+            <ChatTabsProvider>
+              {children}
+              <PersistentTerminal />
+            </ChatTabsProvider>
           </SidebarInset>
       </SidebarProvider>
       <CommandPalette />

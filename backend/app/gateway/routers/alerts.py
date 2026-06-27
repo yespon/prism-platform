@@ -165,6 +165,7 @@ class IncidentSummary(BaseModel):
     last_seen_at: str
     agent_id: str | None
     diagnosis_status: str | None = None
+    owner_user_id: str | None = None
 
 
 class IncidentListResponse(BaseModel):
@@ -264,6 +265,7 @@ async def get_incident_stats(
                 last_seen_at=r.last_seen_at.isoformat() if r.last_seen_at else "",
                 agent_id=r.agent_id,
                 diagnosis_status=r.diagnosis_status,
+                owner_user_id=r.owner_user_id,
             )
             for r in recent_rows
         ]
@@ -325,6 +327,7 @@ async def list_incidents(
                 last_seen_at=r.last_seen_at.isoformat() if r.last_seen_at else "",
                 agent_id=r.agent_id,
                 diagnosis_status=r.diagnosis_status,
+                owner_user_id=r.owner_user_id,
             )
             for r in rows
         ],
@@ -344,6 +347,7 @@ class IncidentDetail(BaseModel):
     status: str
     service: str | None
     environment: str | None
+    owner_user_id: str | None = None
     owner_team_id: str | None = None
     signal_count: int
     first_seen_at: str
@@ -360,6 +364,9 @@ class IncidentDetail(BaseModel):
     diagnosis_status: str | None = None
     diagnosis_result: str | None = None
     diagnosis_error: str | None = None
+    ticket_id: str | None = None
+    ticket_url: str | None = None
+    ticket_provider: str | None = None
     signals: list[dict]
     related_incidents: list[IncidentSummary] = []
     recent_changes: list[dict] = []
@@ -446,6 +453,7 @@ async def get_incident(
                 last_seen_at=r.last_seen_at.isoformat() if r.last_seen_at else "",
                 agent_id=r.agent_id,
                 diagnosis_status=r.diagnosis_status,
+                owner_user_id=r.owner_user_id,
             )
             for r in related_result.scalars().all()
         ]
@@ -517,6 +525,7 @@ async def get_incident(
         status=incident.status,
         service=incident.service,
         environment=incident.environment,
+        owner_user_id=incident.owner_user_id,
         owner_team_id=incident.owner_team_id,
         signal_count=incident.signal_count,
         first_seen_at=incident.first_seen_at.isoformat() if incident.first_seen_at else "",
@@ -533,12 +542,174 @@ async def get_incident(
         diagnosis_status=incident.diagnosis_status,
         diagnosis_result=incident.diagnosis_result,
         diagnosis_error=incident.diagnosis_error,
+        ticket_id=incident.ticket_id,
+        ticket_url=incident.ticket_url,
+        ticket_provider=incident.ticket_provider,
         signals=signals,
         related_incidents=related,
         recent_changes=recent_changes,
         created_at=incident.created_at.isoformat() if incident.created_at else "",
         updated_at=incident.updated_at.isoformat() if incident.updated_at else "",
     )
+
+
+class TimelineEvent(BaseModel):
+    type: str  # signal, ai_analysis, diagnosis, action, status_change
+    timestamp: str
+    title: str
+    detail: str | None = None
+    actor: str | None = None
+    metadata: dict | None = None
+
+
+@router.get(
+    "/incidents/{incident_id}/timeline",
+    response_model=list[TimelineEvent],
+    summary="Get incident timeline",
+    description="Get a unified timeline of signals, AI analysis, diagnosis, and user actions for an incident.",
+)
+async def get_incident_timeline(
+    incident_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> list[TimelineEvent]:
+    tenant_id = require_tenant_context(request)
+
+    # Verify incident exists and belongs to tenant
+    inc_result = await session.exec(
+        select(Incident).where(
+            Incident.id == incident_id,
+            Incident.tenant_id == tenant_id,
+        )
+    )
+    incident = inc_result.scalars().first()
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    events: list[TimelineEvent] = []
+
+    # 1. Signal events
+    links_result = await session.exec(
+        select(IncidentSignalLink).where(
+            IncidentSignalLink.incident_id == incident_id,
+            IncidentSignalLink.tenant_id == tenant_id,
+        )
+    )
+    signal_ids = [l.signal_id for l in links_result.scalars().all()]
+    if signal_ids:
+        sig_result = await session.exec(
+            select(Signal).where(Signal.id.in_(signal_ids)).order_by(Signal.occurred_at.asc())
+        )
+        for s in sig_result.scalars().all():
+            status_label = "告警触发" if s.status == "firing" else "告警恢复"
+
+            # Fetch raw_payload from linked RawAlert if available
+            raw_payload = None
+            if s.raw_alert_id:
+                raw_alert = await session.get(RawAlert, s.raw_alert_id)
+                if raw_alert:
+                    raw_payload = raw_alert.payload_json
+
+            events.append(TimelineEvent(
+                type="signal",
+                timestamp=s.occurred_at.isoformat() if s.occurred_at else s.created_at.isoformat(),
+                title=f"{status_label}: {s.title or 'Untitled Signal'}",
+                detail=s.summary,
+                actor="system",
+                metadata={
+                    "signal_id": s.id,
+                    "severity": s.severity,
+                    "source": s.source,
+                    "service": s.service,
+                    "status": s.status,
+                    "labels_json": s.labels_json,
+                    "raw_payload": raw_payload,
+                },
+            ))
+
+    # 2. AI analysis events
+    if incident.ai_summary:
+        events.append(TimelineEvent(
+            type="ai_analysis",
+            timestamp=incident.updated_at.isoformat(),
+            title="AI 智能解读完成",
+            detail=incident.ai_summary[:200] if incident.ai_summary else None,
+            actor="system",
+            metadata={"ai_impact": incident.ai_impact, "ai_suggestion": incident.ai_suggestion},
+        ))
+
+    # 3. Diagnosis events
+    if incident.diagnosis_status:
+        status_labels = {
+            "running": "Agent 诊断进行中",
+            "completed": "Agent 诊断已完成",
+            "failed": "Agent 诊断失败",
+            "cancelled": "Agent 诊断已取消",
+            "partial": "Agent 部分诊断完成",
+        }
+        events.append(TimelineEvent(
+            type="diagnosis",
+            timestamp=incident.updated_at.isoformat(),
+            title=status_labels.get(incident.diagnosis_status, f"Agent 诊断: {incident.diagnosis_status}"),
+            detail=incident.diagnosis_result[:300] if incident.diagnosis_result else incident.diagnosis_error,
+            actor=incident.agent_id or "system",
+            metadata={
+                "diagnosis_status": incident.diagnosis_status,
+                "agent_id": incident.agent_id,
+                "thread_id": incident.thread_id,
+            },
+        ))
+
+    # 4. User actions (from incident_actions table)
+    from app.models.alerting import IncidentAction
+    actions_result = await session.exec(
+        select(IncidentAction).where(
+            IncidentAction.incident_id == incident_id,
+            IncidentAction.tenant_id == tenant_id,
+        ).order_by(IncidentAction.created_at.asc())
+    )
+    action_labels = {
+        "suppressed": "标记为误报 (Suppressed)",
+        "unsuppressed": "撤销误报标记",
+        "claimed": "认领告警",
+        "assigned": "指派告警",
+        "manual_resolved": "手动标记已恢复",
+        "ticket_created": "创建外部工单",
+    }
+    for a in actions_result.scalars().all():
+        label = action_labels.get(a.action_type, a.action_type)
+        detail = None
+        if a.action_type == "assigned":
+            detail = f"指派给 {a.action_payload.get('owner_user_id', 'unknown')}"
+        elif a.action_type == "ticket_created":
+            detail = f"工单: {a.action_payload.get('ticket_id', 'unknown')}"
+        elif a.action_type == "manual_resolved":
+            note = a.action_payload.get("resolution_note")
+            detail = f"恢复备注: {note}" if note else None
+        events.append(TimelineEvent(
+            type="action",
+            timestamp=a.created_at.isoformat(),
+            title=label,
+            detail=detail,
+            actor=a.actor_id,
+            metadata={"action_type": a.action_type, "action_payload": a.action_payload},
+        ))
+
+    # 5. Status change event (when incident was resolved automatically or via manual action)
+    if incident.resolved_at and incident.status == "resolved":
+        events.append(TimelineEvent(
+            type="status_change",
+            timestamp=incident.resolved_at.isoformat(),
+            title="告警已恢复",
+            detail=f"Incident 状态变更为 resolved",
+            actor="system",
+            metadata={"previous_status": "firing", "new_status": "resolved"},
+        ))
+
+    # Sort all events by timestamp
+    events.sort(key=lambda e: e.timestamp)
+
+    return events
 
 
 @router.post(
@@ -613,6 +784,299 @@ async def unsuppress_incident_endpoint(
     await session.commit()
 
     return {"status": "firing", "incident_id": incident_id}
+
+
+@router.post(
+    "/incidents/{incident_id}/claim",
+    status_code=200,
+    summary="Claim incident",
+    description="Claim ownership of an incident (set owner to current user).",
+)
+async def claim_incident(
+    incident_id: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = require_tenant_context(request)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = await session.exec(
+        select(Incident).where(
+            Incident.id == incident_id,
+            Incident.tenant_id == tenant_id,
+        )
+    )
+    incident = result.scalars().first()
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status not in ("firing", "suppressed"):
+        raise HTTPException(status_code=400, detail=f"Cannot claim incident with status '{incident.status}'")
+
+    incident.owner_user_id = user_id
+    session.add(incident)
+
+    import uuid
+    from app.models.alerting import IncidentAction
+    action = IncidentAction(
+        id=str(uuid.uuid4()),
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        actor_id=user_id,
+        action_type="claimed",
+        action_payload={"owner_user_id": user_id},
+    )
+    session.add(action)
+    await session.commit()
+
+    return {"status": "claimed", "incident_id": incident_id, "owner_user_id": user_id}
+
+
+class AssignIncidentBody(BaseModel):
+    owner_user_id: str
+
+
+@router.post(
+    "/incidents/{incident_id}/assign",
+    status_code=200,
+    summary="Assign incident",
+    description="Assign an incident to a specific user.",
+)
+async def assign_incident(
+    incident_id: str,
+    body: AssignIncidentBody,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = require_tenant_context(request)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = await session.exec(
+        select(Incident).where(
+            Incident.id == incident_id,
+            Incident.tenant_id == tenant_id,
+        )
+    )
+    incident = result.scalars().first()
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    incident.owner_user_id = body.owner_user_id
+    session.add(incident)
+
+    import uuid
+    from app.models.alerting import IncidentAction
+    action = IncidentAction(
+        id=str(uuid.uuid4()),
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        actor_id=user_id,
+        action_type="assigned",
+        action_payload={"owner_user_id": body.owner_user_id, "assigned_by": user_id},
+    )
+    session.add(action)
+    await session.commit()
+
+    return {"status": "assigned", "incident_id": incident_id, "owner_user_id": body.owner_user_id}
+
+
+class ResolveIncidentBody(BaseModel):
+    resolution_note: str | None = None
+
+
+@router.post(
+    "/incidents/{incident_id}/resolve",
+    status_code=200,
+    summary="Resolve incident",
+    description="Manually mark an incident as resolved.",
+)
+async def resolve_incident_endpoint(
+    incident_id: str,
+    body: ResolveIncidentBody | None = None,
+    request: Request = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = require_tenant_context(request)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = await session.exec(
+        select(Incident).where(
+            Incident.id == incident_id,
+            Incident.tenant_id == tenant_id,
+        )
+    )
+    incident = result.scalars().first()
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.status == "resolved":
+        raise HTTPException(status_code=400, detail="Incident is already resolved")
+
+    from datetime import UTC, datetime as dt
+
+    incident.status = "resolved"
+    incident.resolved_at = dt.now(UTC)
+    session.add(incident)
+
+    note = body.resolution_note if body else None
+
+    import uuid
+    from app.models.alerting import IncidentAction
+    action = IncidentAction(
+        id=str(uuid.uuid4()),
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        actor_id=user_id,
+        action_type="manual_resolved",
+        action_payload={"resolution_note": note} if note else {},
+    )
+    session.add(action)
+    await session.commit()
+
+    # Trigger IM notification for resolution if configured
+    try:
+        from datetime import UTC, datetime as dt
+        from app.alerting.notify import send_incident_resolved
+        now = dt.now(UTC)
+        first_seen = incident.first_seen_at.replace(tzinfo=UTC) if incident.first_seen_at and incident.first_seen_at.tzinfo is None else incident.first_seen_at
+        if first_seen:
+            duration_minutes = int((now - first_seen).total_seconds() / 60)
+        else:
+            duration_minutes = 0
+        await send_incident_resolved(incident, duration_minutes)
+    except Exception:
+        logger.exception("Failed to send resolved notification for incident=%s", incident_id)
+
+    return {"status": "resolved", "incident_id": incident_id}
+
+
+class CreateTicketBody(BaseModel):
+    provider: str = "webhook"
+
+
+@router.post(
+    "/incidents/{incident_id}/ticket",
+    status_code=200,
+    summary="Create external ticket",
+    description="Create an external ticket for this incident via configured webhook or provider.",
+)
+async def create_incident_ticket(
+    incident_id: str,
+    body: CreateTicketBody | None = None,
+    request: Request = None,
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    tenant_id = require_tenant_context(request)
+    user_id = getattr(request.state, "user_id", None)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    result = await session.exec(
+        select(Incident).where(
+            Incident.id == incident_id,
+            Incident.tenant_id == tenant_id,
+        )
+    )
+    incident = result.scalars().first()
+    if incident is None:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.ticket_id:
+        raise HTTPException(status_code=400, detail="Ticket already exists for this incident")
+
+    # Find the ticket config from the incident's alert source
+    links_result = await session.exec(
+        select(IncidentSignalLink).where(
+            IncidentSignalLink.incident_id == incident_id,
+            IncidentSignalLink.tenant_id == tenant_id,
+        )
+    )
+    signal_ids = [l.signal_id for l in links_result.scalars().all()]
+
+    ticket_config = {}
+    if signal_ids:
+        raw_ids_res = await session.exec(
+            select(Signal.raw_alert_id).where(
+                Signal.id.in_(signal_ids),
+                Signal.raw_alert_id.isnot(None),
+            )
+        )
+        raw_alert_ids = list({r for r in raw_ids_res.scalars().all()})
+        if raw_alert_ids:
+            src_ids_res = await session.exec(
+                select(RawAlert.source_id).where(
+                    RawAlert.id.in_(raw_alert_ids),
+                    RawAlert.source_id.isnot(None),
+                )
+            )
+            source_ids = list({r for r in src_ids_res.scalars().all()})
+            if source_ids:
+                src_result = await session.exec(
+                    select(AlertSource).where(
+                        AlertSource.tenant_id == tenant_id,
+                        AlertSource.id.in_(source_ids),
+                    )
+                )
+                for src in src_result.scalars().all():
+                    ticket_config = (src.config_json or {}).get("ticket", {})
+                    if ticket_config:
+                        break
+
+    if not ticket_config:
+        raise HTTPException(status_code=400, detail="No ticket provider configured for this incident's alert source")
+
+    # Collect signal data for ticket context
+    signals_data: list[dict] = []
+    if signal_ids:
+        sig_result = await session.exec(select(Signal).where(Signal.id.in_(signal_ids)))
+        for s in sig_result.scalars().all():
+            signals_data.append({
+                "title": s.title,
+                "severity": s.severity,
+                "source": s.source,
+                "status": s.status,
+            })
+
+    from app.alerting.ticket_provider import create_ticket as do_create_ticket
+
+    try:
+        ticket_result = await do_create_ticket(incident, ticket_config, signals_data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+
+    incident.ticket_id = ticket_result.ticket_id
+    incident.ticket_url = ticket_result.ticket_url
+    incident.ticket_provider = ticket_result.provider
+    session.add(incident)
+
+    import uuid
+    from app.models.alerting import IncidentAction
+    action = IncidentAction(
+        id=str(uuid.uuid4()),
+        tenant_id=incident.tenant_id,
+        incident_id=incident.id,
+        actor_id=user_id,
+        action_type="ticket_created",
+        action_payload={
+            "ticket_id": ticket_result.ticket_id,
+            "ticket_url": ticket_result.ticket_url,
+            "provider": ticket_result.provider,
+        },
+    )
+    session.add(action)
+    await session.commit()
+
+    return {
+        "ticket_id": ticket_result.ticket_id,
+        "ticket_url": ticket_result.ticket_url,
+        "provider": ticket_result.provider,
+        "incident_id": incident_id,
+    }
 
 
 @router.post(
@@ -1458,6 +1922,65 @@ async def delete_alert_source(
     await session.commit()
 
 
+class AlertSourceTestRequest(BaseModel):
+    payload: dict
+
+
+@router.post(
+    "/alert-sources/{source_id}/test",
+    summary="Test alert source with a sample payload",
+    description="Send a test payload through the ingest pipeline and return the parsed signal without persisting.",
+)
+async def test_alert_source(
+    source_id: str,
+    body: AlertSourceTestRequest,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+):
+    tenant_id = require_tenant_admin(request)
+
+    result = await session.exec(
+        select(AlertSource).where(
+            AlertSource.id == source_id,
+            AlertSource.tenant_id == tenant_id,
+        )
+    )
+    source = result.scalars().first()
+    if source is None:
+        raise HTTPException(status_code=404, detail="Alert source not found")
+
+    from app.alerting.providers import get_provider
+
+    provider = get_provider(source.type)
+    if provider is None:
+        raise HTTPException(status_code=400, detail=f"No provider for type '{source.type}'")
+
+    try:
+        raw_alert = provider.parse_raw_payload(body.payload, {})
+        raw_alert.id = "test"
+        raw_alert.tenant_id = tenant_id
+        raw_alert.source_id = source_id
+
+        signal = provider.normalize(raw_alert, source_config=source.config_json)
+
+        return {
+            "status": "ok",
+            "source_type": source.type,
+            "signal": {
+                "title": signal.title,
+                "summary": signal.summary,
+                "severity": signal.severity,
+                "status": signal.status,
+                "service": signal.service,
+                "environment": signal.environment,
+                "labels": signal.labels_json,
+            },
+            "field_mapping": source.config_json.get("field_mapping", {}),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Normalization failed: {str(e)}")
+
+
 # ---------------------------------------------------------------------------
 # Alerting Settings (per-tenant config)
 # ---------------------------------------------------------------------------
@@ -1797,3 +2320,220 @@ async def ingest_change(
     await session.commit()
 
     return {"id": change.id, "status": "ingested"}
+
+
+# ── Dashboard / Stats ────────────────────────────────────────────────────────────
+
+class IncidentStatsSummary(BaseModel):
+    total_firing: int
+    total_resolved: int
+    total_suppressed: int
+    severity_distribution: dict[str, int]  # e.g. {"critical": 3, "warning": 7}
+    mttr_minutes: float | None = None  # Mean Time To Resolve
+    mtta_minutes: float | None = None  # Mean Time To Acknowledge (claim/assign)
+    recent_trend: list[dict]  # daily counts for last 7 days
+
+
+@router.get(
+    "/incidents/stats/summary",
+    response_model=IncidentStatsSummary,
+    summary="Get incident dashboard stats",
+    description="Get summary statistics for the incident dashboard including MTTR, MTTA, severity distribution, and 7-day trend.",
+)
+async def get_incident_stats_summary(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> IncidentStatsSummary:
+    from datetime import UTC, datetime as dt, timedelta
+    tenant_id = require_tenant_context(request)
+
+    now = dt.now(UTC)
+
+    # Count by status
+    firing_count = 0
+    resolved_count = 0
+    suppressed_count = 0
+    severity_dist: dict[str, int] = {}
+
+    count_result = await session.exec(
+        select(Incident).where(Incident.tenant_id == tenant_id)
+    )
+    for inc in count_result.scalars().all():
+        if inc.status == "firing":
+            firing_count += 1
+        elif inc.status == "resolved":
+            resolved_count += 1
+        elif inc.status == "suppressed":
+            suppressed_count += 1
+        severity_dist[inc.severity] = severity_dist.get(inc.severity, 0) + 1
+
+    thirty_days_ago = now - timedelta(days=30)
+
+    # MTTR: average time from first_seen to resolved for resolved incidents
+    mttr: float | None = None
+    mttr_times: list[float] = []
+    mttr_result = await session.exec(
+        select(Incident).where(
+            Incident.tenant_id == tenant_id,
+            Incident.status == "resolved",
+            Incident.resolved_at.isnot(None),
+            Incident.first_seen_at >= thirty_days_ago,
+        )
+    )
+    for inc in mttr_result.scalars().all():
+        if inc.first_seen_at and inc.resolved_at:
+            delta = (inc.resolved_at - inc.first_seen_at).total_seconds() / 60
+            if delta > 0:
+                mttr_times.append(delta)
+    if mttr_times:
+        mttr = sum(mttr_times) / len(mttr_times)
+
+    # MTTA: average time from first_seen to first claim/assign
+    from app.models.alerting import IncidentAction
+    mtta: float | None = None
+    mtta_times: list[float] = []
+    mtta_result = await session.exec(
+        select(Incident).where(
+            Incident.tenant_id == tenant_id,
+            Incident.first_seen_at >= thirty_days_ago,
+        )
+    )
+    for inc in mtta_result.scalars().all():
+        if not inc.first_seen_at:
+            continue
+        action_result = await session.exec(
+            select(IncidentAction).where(
+                IncidentAction.incident_id == inc.id,
+                IncidentAction.tenant_id == tenant_id,
+                IncidentAction.action_type.in_(["claimed", "assigned"]),
+            ).order_by(IncidentAction.created_at.asc()).limit(1)
+        )
+        first_ack = action_result.scalars().first()
+        if first_ack:
+            delta = (first_ack.created_at - inc.first_seen_at).total_seconds() / 60
+            if delta > 0:
+                mtta_times.append(delta)
+    if mtta_times:
+        mtta = sum(mtta_times) / len(mtta_times)
+
+    # 7-day trend: count incidents created per day
+    recent_trend: list[dict] = []
+    for day_offset in range(6, -1, -1):
+        day_start = (now - timedelta(days=day_offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        day_count_result = await session.exec(
+            select(Incident).where(
+                Incident.tenant_id == tenant_id,
+                Incident.created_at >= day_start,
+                Incident.created_at < day_end,
+            )
+        )
+        count = len(day_count_result.scalars().all())
+        recent_trend.append({
+            "date": day_start.strftime("%Y-%m-%d"),
+            "count": count,
+        })
+
+    return IncidentStatsSummary(
+        total_firing=firing_count,
+        total_resolved=resolved_count,
+        total_suppressed=suppressed_count,
+        severity_distribution=severity_dist,
+        mttr_minutes=round(mttr, 1) if mttr else None,
+        mtta_minutes=round(mtta, 1) if mtta else None,
+        recent_trend=recent_trend,
+    )
+
+
+# ── Source Health ──────────────────────────────────────────────────────────────
+
+class SourceHealthItem(BaseModel):
+    source_id: str
+    source_name: str
+    source_type: str
+    status: str  # active, disabled
+    last_received_at: str | None = None
+    total_received_24h: int = 0
+    total_errors_24h: int = 0
+    health: str = "unknown"  # healthy, warning, error, unknown
+
+
+@router.get(
+    "/alert-sources/health",
+    response_model=list[SourceHealthItem],
+    summary="Get alert source health status",
+    description="Return health metrics for all alert sources: last received time, 24h volume, error rate, and health status.",
+)
+async def get_source_health(
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+) -> list[SourceHealthItem]:
+    from datetime import UTC, datetime as dt, timedelta
+    tenant_id = require_tenant_context(request)
+
+    now = dt.now(UTC)
+    day_ago = now - timedelta(hours=24)
+
+    # Fetch all sources for tenant
+    sources_result = await session.exec(
+        select(AlertSource).where(AlertSource.tenant_id == tenant_id)
+    )
+    sources = sources_result.scalars().all()
+
+    # For each source, compute health metrics from raw_alerts
+    result: list[SourceHealthItem] = []
+    for source in sources:
+        # Count 24h received
+        count_24h_result = await session.exec(
+            select(RawAlert).where(
+                RawAlert.tenant_id == tenant_id,
+                RawAlert.source_id == source.id,
+                RawAlert.received_at >= day_ago,
+            )
+        )
+        total_24h = len(count_24h_result.scalars().all())
+
+        # Count 24h errors (ingest_status != "received" means error)
+        errors_24h_result = await session.exec(
+            select(RawAlert).where(
+                RawAlert.tenant_id == tenant_id,
+                RawAlert.source_id == source.id,
+                RawAlert.received_at >= day_ago,
+                RawAlert.ingest_status != "received",
+            )
+        )
+        total_errors_24h = len(errors_24h_result.scalars().all())
+
+        # Last received
+        last_result = await session.exec(
+            select(RawAlert).where(
+                RawAlert.tenant_id == tenant_id,
+                RawAlert.source_id == source.id,
+            ).order_by(RawAlert.received_at.desc()).limit(1)
+        )
+        last_raw = last_result.scalars().first()
+        last_received = last_raw.received_at.isoformat() if last_raw and last_raw.received_at else None
+
+        # Health determination
+        if source.status != "active":
+            health = "unknown"
+        elif total_24h == 0:
+            health = "warning"  # active but no data in 24h
+        elif total_errors_24h > 0:
+            error_rate = total_errors_24h / max(total_24h, 1)
+            health = "error" if error_rate > 0.5 else ("warning" if error_rate > 0.1 else "healthy")
+        else:
+            health = "healthy"
+
+        result.append(SourceHealthItem(
+            source_id=source.id,
+            source_name=source.name,
+            source_type=source.type,
+            status=source.status,
+            last_received_at=last_received,
+            total_received_24h=total_24h,
+            total_errors_24h=total_errors_24h,
+            health=health,
+        ))
+
+    return result

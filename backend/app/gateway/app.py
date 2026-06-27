@@ -14,6 +14,7 @@ from app.gateway.routers import (
     alerts,
     announcements,
     artifacts,
+    assets,
     auth as auth_routes,
     channels,
     mcp,
@@ -21,10 +22,12 @@ from app.gateway.routers import (
     models,
     skills,
     suggestions,
+    summarization,
     templates,
     tenants,
     threads,
     uploads,
+    terminal,
 )
 from deerflow.config.app_config import get_app_config
 
@@ -280,6 +283,16 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     # Alerting APIs — ingest is unauthenticated (source-level token auth);
     # incident list/detail and source management require normal auth.
     app.include_router(alerts.router)
+
+    # Terminal websocket API
+    app.include_router(terminal.router, prefix="/api/v1/terminal")
+
+
+    # Assets Management API
+    app.include_router(assets.router)
+
+    # Summarization settings API (tenant-admin)
+    app.include_router(summarization.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:

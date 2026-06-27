@@ -197,6 +197,7 @@ export const ko: Translations = {
     auditGovernance: "감사 및 거버넌스",
     systemSettings: "시스템 설정",
     incidents: "알림",
+    skillsPlaza: "스킬 광장",
   },
 
   // Agents
@@ -353,8 +354,9 @@ export const ko: Translations = {
     summarizations: "요약",
     summarizationsCount: (count: number) =>
       `${count}회 요약`,
-    triggerProgress: "트리거 진행률",
+    triggerProgress: "트리거 진행 상황",
     triggerThreshold: "트리거 임계값",
+    contextWarning: "컨텍스트 사용량이 높습니다. 최적의 성능을 위해 새 세션을 시작하는 것이 좋습니다.",
   },
 
   // Shortcuts
@@ -1005,6 +1007,7 @@ export const ko: Translations = {
       user: "사용자",
       modelLifecycle: "모델 수명 주기",
       memory: "메모리",
+      summarization: "컨텍스트 압축",
       tools: "도구",
       skills: "스킬",
       notification: "알림",
@@ -1044,6 +1047,25 @@ export const ko: Translations = {
           view: "보기",
         },
       },
+    },
+    summarization: {
+      title: "컨텍스트 압축",
+      description:
+        "대화 기록이 모델 컨텍스트 제한에 가까워질 때 자동으로 이전 대화를 요약 압축합니다. 적절한 설정으로 컨텍스트 오버플로우 오류를 방지하고 대화 일관성을 유지합니다.",
+      enabled: "자동 압축 활성화",
+      enabledDescription: "활성화하면 토큰 수 또는 메시지 수가 임계값에 도달할 때 대화 기록을 자동으로 압축합니다.",
+      triggerTokens: "토큰 트리거 임계값",
+      triggerTokensDescription:
+        "대화 토큰 수가 이 값에 도달하면 압축이 트리거됩니다. 모델의 컨텍스트 창에 따라 자동 조정됩니다 (권장: 10000-20000).",
+      triggerMessages: "메시지 트리거 임계값",
+      triggerMessagesDescription:
+        "메시지 수가 이 값에 도달하면 압축이 트리거됩니다. 보조 보호 장치로 작동합니다.",
+      keepMessages: "유지할 메시지 수",
+      keepMessagesDescription:
+        "압축 후 유지할 최근 전체 메시지 수. 최신 대화 컨텍스트를 잃지 않도록 합니다.",
+      trimTokens: "요약 컨텍스트 상한",
+      trimTokensDescription:
+        "요약 모델에 전송할 대화 기록의 최대 토큰 수. 이 값을 초과하는 기록은 요약 생성 전에 잘립니다.",
     },
     appearance: {
       themeTitle: "테마",

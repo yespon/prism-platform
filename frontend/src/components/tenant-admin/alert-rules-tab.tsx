@@ -37,8 +37,6 @@ import {
   useUpdateAlertRule,
   useDeleteAlertRule,
   type AlertRule,
-  type AlertRuleConditionItem,
-  type AlertRuleCondition,
   type AlertRuleCreate
 } from "@/core/alerting";
 
@@ -205,10 +203,10 @@ export function AlertRulesTab() {
     }
 
     try {
-      const conditionJson: AlertRuleCondition & { schedule?: any } = {
+      const conditionJson: Record<string, unknown> & { schedule?: Record<string, unknown> } = {
         logic,
         conditions: filteredConditions
-      };
+      } as Record<string, unknown> & { schedule?: Record<string, unknown> };
       if (scheduleEnabled) {
         conditionJson.schedule = {
           days: scheduleDays.length > 0 ? scheduleDays : undefined,
@@ -431,7 +429,7 @@ export function AlertRulesTab() {
               </thead>
               <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
                 {filteredRules.map((rule) => {
-                  const conditionsList = rule.condition_json?.conditions || [];
+                  const conditionsList = ((rule.condition_json as Record<string, unknown> | null)?.conditions as Array<Record<string, unknown>> | null) || [];
                   const ruleAction = (rule.action_json as any)?.action || "-";
 
                   return (
@@ -475,7 +473,7 @@ export function AlertRulesTab() {
                           )}
                           {conditionsList.length > 1 && (
                             <Badge variant="outline" className="px-1 py-0 text-[8px] leading-none uppercase font-bold bg-zinc-50 border border-zinc-200">
-                              {rule.condition_json?.logic || "AND"}
+                              {String((rule.condition_json as Record<string, unknown> | null)?.logic || "AND")}
                             </Badge>
                           )}
                           {(rule.condition_json as any)?.schedule && (

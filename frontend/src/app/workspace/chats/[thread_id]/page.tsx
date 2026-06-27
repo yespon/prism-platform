@@ -34,15 +34,20 @@ export default function ChatPage() {
     openedThreadIds,
     activeThreadId,
     openThread,
+    closeThread,
   } = useChatTabs();
 
   const [settings, setSettings] = useLocalSettings();
+  const isNewChatClickRef = useRef(false);
 
   // Register URL thread on mount.
   // If navigating back to /chats/new from another workspace menu and we already
   // have opened threads, restore the last active one instead of creating a new chat.
   useEffect(() => {
-    if (urlThreadId === "new" && openedThreadIds.length > 0 && activeThreadId) {
+    if (isNewChatClickRef.current) {
+      return;
+    }
+    if (urlThreadId === "new" && openedThreadIds.length > 0 && activeThreadId && activeThreadId !== "new") {
       history.replaceState(null, "", pathOfThread(activeThreadId));
     } else if (urlThreadId === "new") {
       openThread("new");
@@ -131,8 +136,15 @@ export default function ChatPage() {
   }, [deleteThread, selectedIds, activeThreadId]);
 
   const handleNewChat = useCallback(() => {
-    openThread("new");
-  }, [openThread]);
+    isNewChatClickRef.current = true;
+    closeThread("new");
+    setTimeout(() => {
+      openThread("new");
+      setTimeout(() => {
+        isNewChatClickRef.current = false;
+      }, 100);
+    }, 0);
+  }, [closeThread, openThread]);
 
   const handleOpenThread = useCallback((tid: string) => {
     setHistoryOpen(false);
@@ -192,12 +204,14 @@ export default function ChatPage() {
 
   const handleModelSelect = useCallback(
     (model_name: string) => {
+      const selectedModel = models.find((m) => m.name === model_name);
       setSettings("context", {
         ...settings.context,
         model_name,
+        model_max_input_tokens: selectedModel?.max_input_tokens ?? undefined,
       });
     },
-    [settings.context, setSettings],
+    [settings.context, setSettings, models],
   );
 
   const handleContextChange = useCallback(

@@ -16,7 +16,7 @@ from deerflow.config.model_config import ModelConfig
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.skills_config import SkillsConfig
 from deerflow.config.subagents_config import load_subagents_config_from_dict
-from deerflow.config.summarization_config import load_summarization_config_from_dict
+from deerflow.config.summarization_config import load_summarization_config_from_payload
 from deerflow.config.tenant_context import get_current_tenant_id, get_current_user_id
 from deerflow.config.title_config import load_title_config_from_dict
 from deerflow.config.token_usage_config import TokenUsageConfig
@@ -101,9 +101,8 @@ class AppConfig(BaseModel):
         if "title" in config_data:
             load_title_config_from_dict(config_data["title"])
 
-        # Load summarization config if present
-        if "summarization" in config_data:
-            load_summarization_config_from_dict(config_data["summarization"])
+        # Summarization config is no longer in config.yaml — it's managed via
+        # tenant-admin settings (DB). See _get_user_scoped_app_config().
 
         # Load memory config if present
         if "memory" in config_data:
@@ -381,6 +380,10 @@ def _get_user_scoped_app_config(user_id: str) -> AppConfig:
 
     if isinstance(ext_payload, dict):
         merged["extensions"] = ext_payload
+
+    # Load summarization config from DB payload (tenant-admin settings).
+    # Falls back to code defaults if not present.
+    load_summarization_config_from_payload(merged)
 
     user_config = AppConfig.model_validate(merged)
     _user_app_config_cache[cache_key] = user_config

@@ -16,6 +16,7 @@ import {
   StopCircleIcon
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { use, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { toast } from "sonner";
 
@@ -29,14 +30,14 @@ import {
 } from "@/components/ui/sheet";
 import { AiAnalysisCard } from "@/components/workspace/incidents/ai-analysis-card";
 import { IncidentHeader } from "@/components/workspace/incidents/incident-header";
-import { SignalTimeline } from "@/components/workspace/incidents/signal-timeline";
+import { IncidentTimeline, type TimelineEvent } from "@/components/workspace/incidents/signal-timeline";
 import { MarkdownContent } from "@/components/workspace/messages/markdown-content";
 import {
   WorkspaceContainer,
   WorkspaceBody
 } from "@/components/workspace/workspace-container";
 import { useAgents } from "@/core/agents";
-import { useIncidentDetail, useSuppressIncident, useUnsuppressIncident, useAnalyzeIncident, useCancelDiagnosis, getSeverityBadgeStyles, formatDate, diagnoseIncident } from "@/core/alerting";
+import { useIncidentDetail, useSuppressIncident, useUnsuppressIncident, useAnalyzeIncident, useCancelDiagnosis, useClaimIncident, useResolveIncident, useCreateTicket, getSeverityBadgeStyles, formatDate, diagnoseIncident, buildIncidentContext, encodeContextForURL } from "@/core/alerting";
 import {
   type DiagnosisStep,
   parseSSELine,
@@ -53,7 +54,6 @@ import {
 } from "@/core/alerting/diagnosis-types";
 import { pathOfThread } from "@/core/threads/utils";
 import { cn } from "@/lib/utils";
-import { SaveAsSkillDialog } from "@/components/workspace/incidents/save-as-skill-dialog";
 
 // 定义页面接收的 params 动态属性
 interface PageProps {
@@ -63,6 +63,7 @@ interface PageProps {
 export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
   const resolvedParams = use(params);
   const incidentId = resolvedParams.incident_id;
+  const router = useRouter();
 
   // 获取详情数据
   const { data: incident, isLoading, isError, refetch } = useIncidentDetail(incidentId);
@@ -88,6 +89,24 @@ export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
   const [replanCount, setReplanCount] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
   const { mutate: cancelDiagnosisMutate } = useCancelDiagnosis();
+  const { mutate: handleClaim, isPending: claiming } = useClaimIncident();
+  const { mutate: handleResolve, isPending: resolving } = useResolveIncident();
+  const { mutate: handleCreateTicket, isPending: creatingTicket } = useCreateTicket();
+
+  // Timeline data
+  const [timeline, setTimeline] = useState<TimelineEvent[] | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+
+  useEffect(() => {
+    if (!incidentId) return;
+    setTimelineLoading(true);
+    import("@/core/alerting/api").then(({ getIncidentTimeline }) => {
+      getIncidentTimeline(incidentId)
+        .then((data) => setTimeline(data as TimelineEvent[]))
+        .catch(() => setTimeline(null))
+        .finally(() => setTimelineLoading(false));
+    });
+  }, [incidentId]);
 
   const [selectedAgentId, setSelectedAgentId] = useState<string>("");
   const { agents: availableAgents = [], isLoading: isLoadingAgents } = useAgents();
@@ -443,9 +462,21 @@ export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
               onUnsuppress={() => handleUnsuppress(incident.id)}
               onOpenDiagnosis={handleDiagnosisClick}
               onExportReport={handleExportReport}
+              onClaim={() => handleClaim(incident.id)}
+              onResolve={() => handleResolve({ incidentId: incident.id })}
+              onCreateTicket={() => handleCreateTicket(incident.id)}
+              onGoToTerminal={() => {
+                if (!incident) return;
+                const ctx = buildIncidentContext(incident);
+                const encoded = encodeContextForURL(ctx);
+                router.push(`/workspace/terminal?from_incident=${incident.id}&ctx=${encoded}`);
+              }}
               suppressing={suppressing}
               unsuppressing={unsuppressing}
               diagnosing={diagnosing}
+              claiming={claiming}
+              resolving={resolving}
+              creatingTicket={creatingTicket}
               currentThreadId={currentThreadId ?? null}
             />
           </div>
@@ -455,7 +486,7 @@ export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
 
             {/* 左侧：Signals 时间线 (占位 2/3) */}
             <div className="lg:col-span-2 space-y-6">
-              <SignalTimeline signals={incident.signals ?? []} />
+              <IncidentTimeline signals={incident.signals ?? []} timeline={timeline ?? undefined} isLoading={timelineLoading} />
             </div>
 
             {/* 右侧：AI 解读卡片 */}
@@ -858,12 +889,6 @@ export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <SaveAsSkillDialog
-                          incidentTitle={incident.title ?? incident.incident_key ?? incidentId}
-                          diagnosisText={conclusionText}
-                          diagnosisSteps={diagnosisSteps.map(s => s.label)}
-                          toolCallsSummary={[]}
-                        />
                         {currentThreadId && (
                           <Link
                             href={`${pathOfThread(currentThreadId)}?incident=${encodeURIComponent(incidentId)}`}

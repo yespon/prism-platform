@@ -42,7 +42,6 @@ const ChatHeaderContext = createContext<ChatHeaderContextType | undefined>(undef
 
 export function useChatHeader() {
   const ctx = useContext(ChatHeaderContext);
-  if (!ctx) throw new Error("useChatHeader must be used within ChatHeaderProvider");
   return ctx;
 }
 

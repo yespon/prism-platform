@@ -8,6 +8,7 @@ import {
   ShieldAlertIcon,
   ShieldCheckIcon,
   BotIcon,
+  TerminalSquare,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -59,21 +60,27 @@ export function WorkspaceNavChatList() {
       icon: BellIcon,
       active: pathname.startsWith("/workspace/announcements"),
     },
+    {
+      name: "智能终端",
+      href: "/workspace/terminal",
+      icon: TerminalSquare,
+      active: pathname.startsWith("/workspace/terminal"),
+    },
     ...(isAdmin
       ? [
-          {
-            name: t.sidebarNav.auditGovernance,
-            href: "/admin",
-            icon: ShieldCheckIcon,
-            active: pathname.startsWith("/admin"),
-          },
-          {
-            name: t.sidebarNav.systemSettings,
-            href: "/admin/security",
-            icon: Settings2Icon,
-            active: pathname.startsWith("/admin/security"),
-          },
-        ]
+        {
+          name: t.sidebarNav.auditGovernance,
+          href: "/admin",
+          icon: ShieldCheckIcon,
+          active: pathname.startsWith("/admin"),
+        },
+        {
+          name: t.sidebarNav.systemSettings,
+          href: "/admin/security",
+          icon: Settings2Icon,
+          active: pathname.startsWith("/admin/security"),
+        },
+      ]
       : []),
   ];
 
@@ -96,12 +103,12 @@ export function WorkspaceNavChatList() {
             {link.active && (
               <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-1/2 bg-primary rounded-r-full" />
             )}
-            <Icon 
+            <Icon
               className={cn(
                 "size-[18px] transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
                 link.active && "text-primary scale-110"
-              )} 
-              strokeWidth={link.active ? 2.5 : 2} 
+              )}
+              strokeWidth={link.active ? 2.5 : 2}
             />
             <span className="truncate group-data-[collapsible=icon]:hidden">{link.name}</span>
             {link.href === "/workspace/announcements" && unreadCount > 0 && (

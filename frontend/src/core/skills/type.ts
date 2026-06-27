@@ -25,6 +25,8 @@ export interface AvailableSkillResponse extends Skill {
 
 export interface SkillDetail extends Skill {
   references?: Record<string, string> | null;
+  scope: string;
+  managed_by_current_user: boolean;
 }
 
 export interface AvailableSkillsListResponse {

@@ -103,11 +103,32 @@ async def process_alert(
     raw_alert.ingest_status = "received"
     session.add(raw_alert)
 
-    # Step 2 — normalise to signal
-    signal = provider.normalize(raw_alert, source_config=source.config_json)
-    signal.tenant_id = source.tenant_id
-    signal.raw_alert_id = raw_alert.id  # defensive: ensure link is always populated
-    await create_signal(session, raw_alert, signal)
+    # Step 2 — normalise to signal(s)
+    # For Alertmanager, process all alerts in batch mode
+    if hasattr(provider, "batch_alerts") and source.type == "alertmanager":
+        batch_signals = provider.batch_alerts(raw_alert, source_config=source.config_json)
+        if batch_signals:
+            # Process first signal inline, queue rest as background tasks
+            signal = batch_signals[0]
+            signal.tenant_id = source.tenant_id
+            signal.raw_alert_id = raw_alert.id
+            await create_signal(session, raw_alert, signal)
+
+            # Process remaining signals in background
+            if len(batch_signals) > 1:
+                _schedule_batch_signals(raw_alert, source, batch_signals[1:])
+        else:
+            # Fallback to single normalize
+            signal = provider.normalize(raw_alert, source_config=source.config_json)
+            signal.tenant_id = source.tenant_id
+            signal.raw_alert_id = raw_alert.id
+            await create_signal(session, raw_alert, signal)
+    else:
+        signal = provider.normalize(raw_alert, source_config=source.config_json)
+        signal.tenant_id = source.tenant_id
+        signal.raw_alert_id = raw_alert.id
+        await create_signal(session, raw_alert, signal)
+
     raw_alert.ingest_status = "normalized"
     session.add(raw_alert)
 
@@ -172,6 +193,9 @@ async def process_alert(
 
         schedule_notification(send_incident_created(incident))
 
+        # Evaluate escalation rules for newly created incidents (fire-and-forget)
+        _schedule_escalation_evaluation(incident)
+
     logger.info(
         "ingest source=%s type=%s incident=%s disposition=%s",
         source.id,
@@ -180,6 +204,61 @@ async def process_alert(
         disposition,
     )
     return incident, is_new, disposition
+
+
+def _schedule_escalation_evaluation(incident: Incident):
+    """Fire-and-forget: evaluate escalation rules for a newly created incident."""
+    import asyncio
+
+    from deerflow.database.session import get_session_factory
+
+    async def _run():
+        try:
+            from app.alerting.escalation import evaluate_escalation_rules, apply_escalation_actions
+
+            async with get_session_factory()() as session:
+                fresh_inc = await session.get(Incident, incident.id)
+                if not fresh_inc or fresh_inc.status != "firing":
+                    return
+
+                matching = await evaluate_escalation_rules(fresh_inc, session)
+                if matching:
+                    await apply_escalation_actions(fresh_inc, matching, session)
+                    logger.info(
+                        "Escalation: incident %s matched %d rules",
+                        fresh_inc.incident_key,
+                        len(matching),
+                    )
+        except Exception:
+            logger.exception("Failed to evaluate escalation rules for incident=%s", incident.id)
+
+    asyncio.create_task(_run())
+
+
+def _schedule_batch_signals(raw_alert: RawAlert, source, remaining_signals: list):
+    """Fire-and-forget: process remaining batch signals in background."""
+    import asyncio
+
+    from deerflow.database.session import get_session_factory
+
+    async def _run():
+        try:
+            async with get_session_factory()() as session:
+                for sig in remaining_signals:
+                    sig.id = str(uuid.uuid4())
+                    sig.tenant_id = raw_alert.tenant_id
+                    sig.raw_alert_id = raw_alert.id
+                    session.add(sig)
+                await session.commit()
+                logger.info(
+                    "Batch ingest: processed %d additional signals for raw_alert=%s",
+                    len(remaining_signals),
+                    raw_alert.id,
+                )
+        except Exception:
+            logger.exception("Failed to process batch signals for raw_alert=%s", raw_alert.id)
+
+    asyncio.create_task(_run())
 
 
 def _schedule_agent_diagnosis(incident, tenant_id: str, diagnosis_agent_id: str):

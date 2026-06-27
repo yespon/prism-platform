@@ -20,4 +20,6 @@ export interface AgentThreadContext extends Record<string, unknown> {
   reasoning_effort?: "minimal" | "low" | "medium" | "high";
   agent_name?: string;
   skill_name?: string;
+  /** Maximum input tokens (context window) for the selected model. Used by the frontend for token usage indicators. */
+  model_max_input_tokens?: number;
 }
