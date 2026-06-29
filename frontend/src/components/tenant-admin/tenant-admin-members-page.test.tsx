@@ -68,7 +68,7 @@ describe("TenantAdminMembersPage", () => {
 
     render(<TenantAdminMembersPage />);
 
-    expect(screen.getByText("当前租户成员")).toBeInTheDocument();
+    expect(screen.getByText("当前工作空间成员")).toBeInTheDocument();
     
   });
 });

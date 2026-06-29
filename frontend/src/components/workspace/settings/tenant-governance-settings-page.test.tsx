@@ -44,7 +44,7 @@ describe("TenantGovernanceSettingsPage", () => {
 
     render(<TenantGovernanceSettingsPage />);
 
-    expect(screen.getByText("仅租户管理员可访问该页面。")).toBeInTheDocument();
+    expect(screen.getByText("仅工作空间管理员可访问该页面。")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "添加成员" })).not.toBeInTheDocument();
   });
 

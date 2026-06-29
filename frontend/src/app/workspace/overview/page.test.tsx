@@ -64,11 +64,11 @@ describe("WorkspaceOverviewPage", () => {
     render(<WorkspaceOverviewPage />);
 
     expect(screen.getByRole("heading", { level: 1, name: "工作台总览" })).toBeInTheDocument();
-    expect(screen.getByText("当前租户下可直接获取的资源、会话与治理信息")).toBeInTheDocument();
+    expect(screen.getByText("当前工作空间下可直接获取的资源、会话与治理信息")).toBeInTheDocument();
     expect(screen.getByText("我的会话")).toBeInTheDocument();
     expect(screen.getByText("最近会话")).toBeInTheDocument();
     expect(screen.getByText("能力入口")).toBeInTheDocument();
-    expect(screen.getByText("当前租户下暂无会话记录。")).toBeInTheDocument();
+    expect(screen.getByText("当前工作空间下暂无会话记录。")).toBeInTheDocument();
     expect(screen.getByText("暂无治理审计数据。")).toBeInTheDocument();
   });
 });

@@ -19,6 +19,7 @@ interface AdminTenant {
   name: string;
   slug: string;
   status: string;
+  tenant_type?: string;
   created_at: string;
   member_count: number;
   member_summaries?: Array<{
@@ -52,6 +53,7 @@ export default function AdminTenantsPage() {
     name: string;
     slug: string;
     status: string;
+    tenant_type?: string;
   } | null>(null);
 
   const loadTenants = useCallback(async () => {
@@ -96,6 +98,7 @@ export default function AdminTenantsPage() {
       name: tenant.name,
       slug: tenant.slug,
       status: tenant.status,
+      tenant_type: tenant.tenant_type,
     });
     setEditOpen(true);
   };
@@ -161,6 +164,7 @@ export default function AdminTenantsPage() {
               <thead className="bg-zinc-50 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-500 font-medium">
                 <tr>
                   <th className="px-6 py-4 font-medium">{t.admin.tenants.columns.nameSlug}</th>
+                  <th className="px-6 py-4 font-medium">{t.admin.tenants.columns.type}</th>
                   <th className="px-6 py-4 font-medium">{t.admin.tenants.columns.memberCount}</th>
                   <th className="px-6 py-4 font-medium">{t.admin.tenants.columns.status}</th>
                   <th className="px-6 py-4 font-medium text-right">{t.admin.tenants.columns.actions}</th>
@@ -179,6 +183,17 @@ export default function AdminTenantsPage() {
                       <div className="text-xs text-zinc-500 mt-0.5">
                         {tenant.slug}
                       </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        tenant.tenant_type === 'product' ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400' :
+                        tenant.tenant_type === 'rd' ? 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400' :
+                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                      }`}>
+                        {tenant.tenant_type === 'product' ? t.admin.tenants.types.product :
+                         tenant.tenant_type === 'rd' ? t.admin.tenants.types.rd :
+                         t.admin.tenants.types.ops}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <Tooltip>

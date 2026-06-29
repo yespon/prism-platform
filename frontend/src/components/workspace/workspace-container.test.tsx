@@ -29,7 +29,7 @@ describe("WorkspaceHeader", () => {
 
     render(<WorkspaceHeader />);
 
-    const select = screen.getByRole("combobox", { name: "切换租户" });
+    const select = screen.getByRole("combobox", { name: "切换工作空间" });
     expect(select).toBeInTheDocument();
     fireEvent.change(select, { target: { value: "tenant-b" } });
     expect(mocks.mutate).toHaveBeenCalledWith("tenant-b");

@@ -179,7 +179,7 @@ export function AlertingSettingsTab() {
         <ShieldAlertIcon className="h-12 w-12 text-red-500 animate-bounce" />
         <h3 className="mt-4 text-base font-semibold text-zinc-800 dark:text-zinc-200">配置加载失败</h3>
         <p className="mt-2 text-xs text-muted-foreground max-w-sm">
-          {error instanceof Error ? error.message : "未检测到可用的租户告警设置，请联系管理员核对。"}
+          {error instanceof Error ? error.message : "未检测到可用的工作空间告警设置，请联系管理员核对。"}
         </p>
       </div>
     );

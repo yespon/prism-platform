@@ -23,7 +23,7 @@ describe("scope permissions", () => {
 
   it("scopeLabel maps known scopes", () => {
     expect(scopeLabel("global")).toBe("平台内置");
-    expect(scopeLabel("tenant")).toBe("租户共享");
+    expect(scopeLabel("tenant")).toBe("工作空间共享");
     expect(scopeLabel("user")).toBe("个人私有");
   });
 });

@@ -68,8 +68,16 @@ export function WorkspaceNavMenu() {
     (tenant) => tenant.id === currentTenant?.tenant_id
   );
   const tenantName = currentTenantDetail?.name ?? currentTenant?.tenant_id ?? t.navMenu.unbound;
+  const tenantType = currentTenant?.tenant_type ?? currentTenantDetail?.tenant_type ?? "ops";
   const canSwitchTenant = (tenants?.length ?? 0) > 1;
   const canAccessTenantAdmin = currentTenant?.role === "tenant_admin";
+
+  const typeLabelMap: Record<string, string> = {
+    ops: t.admin.tenants.types.ops,
+    product: t.admin.tenants.types.product,
+    rd: t.admin.tenants.types.rd,
+  };
+  const typeLabel = typeLabelMap[tenantType] ?? tenantType;
 
   const languageOptions: { value: Locale; label: string }[] = [
     { value: "en-US", label: enUS.locale.localName },
@@ -160,18 +168,21 @@ export function WorkspaceNavMenu() {
                         <p className="text-xs text-sidebar-foreground/60 truncate">{userEmail || "user"}</p>
                       </div>
                     </div>
-                    {/* 当前租户信息 */}
+                    {/* 当前工作空间信息 */}
                     <div className="mt-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
                       <div className="flex items-center gap-2 text-xs text-sidebar-foreground/70">
                         <Building2Icon className="size-3" />
                         <span className="truncate">{tenantName}</span>
+                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                          {typeLabel}
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <DropdownMenuSeparator className="bg-sidebar-border" />
 
-                  {/* 切换租户 */}
+                  {/* 切换工作空间 */}
                   {canSwitchTenant && (
                     <DropdownMenuItem
                       onClick={() => router.push("/select-workspace")}

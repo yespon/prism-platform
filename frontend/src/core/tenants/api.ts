@@ -9,11 +9,13 @@ export type TenantItem = {
   name: string;
   slug: string;
   role: string;
+  tenant_type?: string;
 };
 
 export type CurrentTenant = {
   tenant_id: string;
   role: string;
+  tenant_type?: string;
 };
 
 export type TenantMemberRole = "tenant_admin" | "tenant_member";

@@ -58,3 +58,4 @@ data/
 .ruff_cache/
 config.postgres.yaml
 website/
+solutions/

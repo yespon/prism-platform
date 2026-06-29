@@ -122,7 +122,7 @@ function McpEditDialog({ open, onOpenChange, serverState, isTenantAdmin, readOnl
 
   const handleSave = async () => {
     if (readOnly) {
-      toast.error("个人设置为只读视图，请前往租户治理进行编辑");
+      toast.error("个人设置为只读视图，请前往工作空间治理进行编辑");
       return;
     }
 
@@ -142,12 +142,12 @@ function McpEditDialog({ open, onOpenChange, serverState, isTenantAdmin, readOnl
       if (serverState?.name && existingServer) {
         if (existingServer.scope === "tenant") {
           if (!isTenantAdmin) {
-            toast.error("仅租户管理员可编辑租户共享工具");
+            toast.error("仅工作空间管理员可编辑工作空间共享工具");
             return;
           }
           await updateTenantAsync({ name: state.name, config: normalizedConfig });
         } else {
-          toast.error("仅租户管理员可管理租户共享工具");
+          toast.error("仅工作空间管理员可管理工作空间共享工具");
           return;
         }
       } else {

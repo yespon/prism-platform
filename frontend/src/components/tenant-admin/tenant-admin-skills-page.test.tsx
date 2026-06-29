@@ -87,7 +87,7 @@ describe("TenantAdminSkillsPage", () => {
 
     activateTab("自定义技能 (1)");
 
-    expect(screen.getByText("仅展示租户创建的技能，可编辑、删除，或通过上传技能包导入。")).toBeInTheDocument();
+    expect(screen.getByText("仅展示工作空间创建的技能，可编辑、删除，或通过上传技能包导入。")).toBeInTheDocument();
   });
 
   it("creates a manual tenant skill with description and instructions", async () => {

@@ -54,6 +54,7 @@ import {
 } from "@/core/alerting/diagnosis-types";
 import { pathOfThread } from "@/core/threads/utils";
 import { cn } from "@/lib/utils";
+import { useWorkspaceTypeGuard } from "@/core/tenants/use-workspace-type-guard";
 
 // 定义页面接收的 params 动态属性
 interface PageProps {
@@ -61,6 +62,8 @@ interface PageProps {
 }
 
 export default function WorkspaceIncidentDetailPage({ params }: PageProps) {
+  useWorkspaceTypeGuard();
+
   const resolvedParams = use(params);
   const incidentId = resolvedParams.incident_id;
   const router = useRouter();

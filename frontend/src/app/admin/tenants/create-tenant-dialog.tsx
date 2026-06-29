@@ -37,6 +37,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
   const [slug, setSlug] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [ownerUserName, setOwnerUserName] = useState("");
+  const [tenantType, setTenantType] = useState("ops");
   const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState<AdminUserOption[]>([]);
   const [searching, setSearching] = useState(false);
@@ -109,6 +110,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
           slug: slug.trim() || undefined,
           owner_user_id: ownerUserId.trim(),
           owner_role: "tenant_admin",
+          tenant_type: tenantType,
         }),
       });
 
@@ -126,6 +128,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
       setSlug("");
       setOwnerUserId("");
       setOwnerUserName("");
+      setTenantType("ops");
       setSearchTerm("");
     } catch (err: any /* eslint-disable-line @typescript-eslint/no-explicit-any */) {
       setError(err.message);
@@ -175,6 +178,37 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
             />
           </div>
           
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+              {t.admin.tenants.createDialog.typeLabel}
+            </label>
+            <div className="flex gap-2">
+              {(['ops', 'product', 'rd'] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setTenantType(type)}
+                  className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                    tenantType === type
+                      ? type === 'product'
+                        ? 'bg-violet-50 border-violet-300 text-violet-700 dark:bg-violet-900/20 dark:border-violet-700 dark:text-violet-400'
+                        : type === 'rd'
+                        ? 'bg-cyan-50 border-cyan-300 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-700 dark:text-cyan-400'
+                        : 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-700 dark:text-blue-400'
+                      : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                  }`}
+                >
+                  {type === 'product' ? t.admin.tenants.types.product :
+                   type === 'rd' ? t.admin.tenants.types.rd :
+                   t.admin.tenants.types.ops}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-zinc-500">
+              {t.admin.tenants.createDialog.typeDescription}
+            </p>
+          </div>
+
           <div className="space-y-2 relative">
             <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
               {t.admin.tenants.createDialog.ownerLabel} <span className="text-red-500">*</span>

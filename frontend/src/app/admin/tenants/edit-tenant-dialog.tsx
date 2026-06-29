@@ -25,6 +25,7 @@ interface EditTenantDialogProps {
     name: string;
     slug: string;
     status: string;
+    tenant_type?: string;
   } | null;
   onSuccess: () => void;
 }
@@ -40,6 +41,7 @@ export function EditTenantDialog({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState("active");
+  const [tenantType, setTenantType] = useState("ops");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -47,10 +49,12 @@ export function EditTenantDialog({
       setName(tenant.name);
       setSlug(tenant.slug);
       setStatus(tenant.status === "active" ? "active" : "inactive");
+      setTenantType(tenant.tenant_type || "ops");
     } else {
       setName("");
       setSlug("");
       setStatus("active");
+      setTenantType("ops");
     }
     setError(null);
   }, [tenant, open]);
@@ -72,6 +76,7 @@ export function EditTenantDialog({
           name,
           slug,
           status,
+          tenant_type: tenantType,
         }),
       });
 
@@ -141,6 +146,31 @@ export function EditTenantDialog({
                   <SelectItem value="inactive">{t.admin.tenants.editDialog.statusInactive}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium">{t.admin.tenants.editDialog.typeLabel}</label>
+              <div className="flex gap-2">
+                {(['ops', 'product', 'rd'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setTenantType(type)}
+                    className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors border ${
+                      tenantType === type
+                        ? type === 'product'
+                          ? 'bg-violet-50 border-violet-300 text-violet-700 dark:bg-violet-900/20 dark:border-violet-700 dark:text-violet-400'
+                          : type === 'rd'
+                          ? 'bg-cyan-50 border-cyan-300 text-cyan-700 dark:bg-cyan-900/20 dark:border-cyan-700 dark:text-cyan-400'
+                          : 'bg-blue-50 border-blue-300 text-blue-700 dark:bg-blue-900/20 dark:border-blue-700 dark:text-blue-400'
+                        : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 dark:bg-zinc-900 dark:border-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                    }`}
+                  >
+                    {type === 'product' ? t.admin.tenants.types.product :
+                     type === 'rd' ? t.admin.tenants.types.rd :
+                     t.admin.tenants.types.ops}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

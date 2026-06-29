@@ -26,6 +26,7 @@ class TenantItemResponse(BaseModel):
     name: str = Field(..., description="Tenant display name")
     slug: str = Field(..., description="Tenant slug")
     role: str = Field(..., description="Role in the tenant")
+    tenant_type: str = Field(default="ops", description="Tenant type: ops, product, rd")
 
 
 class TenantsListResponse(BaseModel):
@@ -35,6 +36,7 @@ class TenantsListResponse(BaseModel):
 class CurrentTenantResponse(BaseModel):
     tenant_id: str
     role: str
+    tenant_type: str = "ops"
 
 
 class SwitchTenantRequest(BaseModel):
@@ -61,6 +63,7 @@ async def list_tenants(request: Request) -> TenantsListResponse:
                 name=tenant.name,
                 slug=tenant.slug,
                 role=normalize_tenant_role(membership.role),
+                tenant_type=getattr(tenant, "tenant_type", "ops") or "ops",
             )
             for tenant, membership in rows
         ]
@@ -83,7 +86,13 @@ async def get_current_tenant(request: Request) -> CurrentTenantResponse:
         await set_current_tenant_id(user_id, current_tenant_id)
 
     membership = memberships_by_tenant[current_tenant_id]
-    return CurrentTenantResponse(tenant_id=current_tenant_id, role=normalize_tenant_role(membership.role))
+    tenant = next((t for t, _ in rows if t.id == current_tenant_id), None)
+    tenant_type = getattr(tenant, "tenant_type", "ops") or "ops" if tenant else "ops"
+    return CurrentTenantResponse(
+        tenant_id=current_tenant_id,
+        role=normalize_tenant_role(membership.role),
+        tenant_type=tenant_type,
+    )
 
 
 @router.post("/tenants/switch", response_model=CurrentTenantResponse)
@@ -99,7 +108,17 @@ async def switch_tenant(request: Request, body: SwitchTenantRequest) -> CurrentT
 
     await set_current_tenant_id(user_id, tenant_id)
     request.state.tenant_id = tenant_id
-    return CurrentTenantResponse(tenant_id=tenant_id, role=normalize_tenant_role(membership.role))
+
+    # Fetch tenant to get tenant_type
+    rows = await list_user_tenants(user_id)
+    tenant = next((t for t, _ in rows if t.id == tenant_id), None)
+    tenant_type = getattr(tenant, "tenant_type", "ops") or "ops" if tenant else "ops"
+
+    return CurrentTenantResponse(
+        tenant_id=tenant_id,
+        role=normalize_tenant_role(membership.role),
+        tenant_type=tenant_type,
+    )
 
 
 class TenantMemberResponse(BaseModel):

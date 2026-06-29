@@ -75,6 +75,29 @@ class AuthUserRepository:
             row = select_result.fetchone()
             return _row_to_dict(row) if row else None
 
+    def update_user(self, user_id: str, name: str, email: str, role: str, updated_at: str) -> dict[str, Any] | None:
+        """Update a user's profile (name, email, role)."""
+        with auth_connection() as conn:
+            # Check if email is already taken by another user
+            existing = conn.execute(
+                text("SELECT id FROM \"user\" WHERE email = :email AND id != :uid LIMIT 1"),
+                {"email": email, "uid": user_id},
+            ).fetchone()
+            if existing:
+                raise ValueError("Email already in use by another user")
+
+            result = conn.execute(
+                text(
+                    "UPDATE \"user\" SET name = :name, email = :email, role = :role, \"updatedAt\" = :updated_at WHERE id = :uid"
+                ),
+                {"name": name, "email": email, "role": role, "updated_at": updated_at, "uid": user_id},
+            )
+            if result.rowcount == 0:
+                return None
+            conn.commit()
+
+            return self.get_user_by_id(user_id)
+
     def get_account_by_user_id(self, user_id: str) -> dict[str, Any] | None:
         with auth_connection() as conn:
             result = conn.execute(

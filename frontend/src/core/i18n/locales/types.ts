@@ -608,6 +608,23 @@ export interface Translations {
       statusUpdateError: string;
       statusUpdateFail: string;
       bootstrapDeleteForbidden: string;
+      editUser: {
+        title: string;
+        description: string;
+        nameLabel: string;
+        namePlaceholder: string;
+        emailLabel: string;
+        emailPlaceholder: string;
+        roleLabel: string;
+        roleUser: string;
+        roleAdmin: string;
+        cancel: string;
+        saving: string;
+        save: string;
+        saveSuccess: string;
+        saveError: string;
+        validationError: string;
+      };
       createDialog: {
         title: string;
         description: string;
@@ -672,9 +689,15 @@ export interface Translations {
       noMatchDescription: string;
       columns: {
         nameSlug: string;
+        type: string;
         memberCount: string;
         status: string;
         actions: string;
+      };
+      types: {
+        ops: string;
+        product: string;
+        rd: string;
       };
       members: string;
       memberDetails: string;
@@ -701,6 +724,7 @@ export interface Translations {
         save: string;
         editError: string;
         editSuccess: string;
+        typeLabel: string;
       };
       createDialog: {
         title: string;
@@ -725,6 +749,8 @@ export interface Translations {
         ownerRequired: string;
         createError: string;
         createSuccess: string;
+        typeLabel: string;
+        typeDescription: string;
       };
       deleteDialog: {
         title: string;

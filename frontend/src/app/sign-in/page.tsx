@@ -440,7 +440,7 @@ export default function SignInPage() {
         </div>
       </div>
 
-      {/* 未绑定租户提示弹窗 */}
+      {/* 未绑定工作空间提示弹窗 */}
       <Dialog open={showNoTenantDialog} onOpenChange={setShowNoTenantDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

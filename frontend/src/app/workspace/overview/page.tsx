@@ -205,6 +205,7 @@ function HeaderActions() {
 
 export default function WorkspaceOverviewPage() {
   const { t, locale } = useI18n();
+  const { data: currentTenant } = useCurrentTenant();
   // const { agents = [] } = useAgents();
   const { models = [] } = useAvailableModels();
   const { rawArray: tools = [] } = useAvailableMcpConfig();
@@ -216,8 +217,14 @@ export default function WorkspaceOverviewPage() {
     select: ["thread_id", "updated_at", "values"],
   });
 
-  // Load real-time incident statistics
-  const { data: stats, isError: statsError, isLoading: statsLoading } = useIncidentStats();
+  const tenantType = currentTenant?.tenant_type ?? "ops";
+  const isOps = tenantType === "ops";
+
+  // Load real-time incident statistics (only for ops)
+  const statsQuery = useIncidentStats();
+  const stats = isOps ? statsQuery.data : undefined;
+  const statsError = isOps ? statsQuery.isError : false;
+  const statsLoading = isOps ? statsQuery.isLoading : false;
 
 
 
@@ -311,7 +318,10 @@ export default function WorkspaceOverviewPage() {
             />
           </div>
 
-          {/* Premium Alert Metrics Grid */}
+          {/* Premium Alert Metrics Grid — only for ops workspaces */}
+          {isOps && (
+            <>
+
           {statsError && (
             <div className="pt-2">
               <div className="rounded-lg border border-red-200 bg-red-50 dark:border-red-900/40 dark:bg-red-950/30 p-4 text-center">
@@ -353,6 +363,8 @@ export default function WorkspaceOverviewPage() {
               iconColorClass="text-indigo-500"
             />
           </div>
+            </>
+          )}
 
           {/* Balanced Two-Column Workspace Layout */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
@@ -403,27 +415,71 @@ export default function WorkspaceOverviewPage() {
               </OverviewSectionCard>
             </div>
 
-            {/* Right Column: Recent Firing Incidents */}
-            <div className="space-y-6">
-              <OverviewSectionCard
-                title={alertText.recentTitle}
-                description={alertText.recentDesc}
-                actions={
-                  <Link
-                    href="/workspace/incidents"
-                    className="text-xs font-semibold text-indigo-600 hover:underline flex items-center"
-                  >
-                    {alertText.viewAll}
-                  </Link>
-                }
-              >
-                <div className="mt-4">
-                  <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg bg-background/20">
-                    {alertText.noRecent}
+            {/* Right Column: ops → incidents, product/rd → type-specific quick links */}
+            {isOps ? (
+              <div className="space-y-6">
+                <OverviewSectionCard
+                  title={alertText.recentTitle}
+                  description={alertText.recentDesc}
+                  actions={
+                    <Link
+                      href="/workspace/incidents"
+                      className="text-xs font-semibold text-indigo-600 hover:underline flex items-center"
+                    >
+                      {alertText.viewAll}
+                    </Link>
+                  }
+                >
+                  <div className="mt-4">
+                    <div className="py-8 text-center text-xs text-muted-foreground border border-dashed rounded-lg bg-background/20">
+                      {alertText.noRecent}
+                    </div>
                   </div>
-                </div>
-              </OverviewSectionCard>
-            </div>
+                </OverviewSectionCard>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <OverviewSectionCard
+                  title={tenantType === "product" ? "产品设计快速入口" : "研发快速入口"}
+                  description={tenantType === "product" ? "产品经理常用工具与知识库" : "研发人员常用工具与代码库"}
+                >
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    <Link
+                      href="/workspace/chats/new"
+                      className="rounded-xl border bg-card p-4 hover:shadow-md transition-all hover:border-primary/30 group"
+                    >
+                      <SparklesIcon className="size-5 text-indigo-500 mb-2" />
+                      <h4 className="text-sm font-semibold">智能工作台</h4>
+                      <p className="text-xs text-muted-foreground mt-1">开始新对话</p>
+                    </Link>
+                    <Link
+                      href="/workspace/skills"
+                      className="rounded-xl border bg-card p-4 hover:shadow-md transition-all hover:border-primary/30 group"
+                    >
+                      <BoxesIcon className="size-5 text-sky-500 mb-2" />
+                      <h4 className="text-sm font-semibold">技能广场</h4>
+                      <p className="text-xs text-muted-foreground mt-1">浏览可用技能</p>
+                    </Link>
+                    <Link
+                      href="/workspace/terminal"
+                      className="rounded-xl border bg-card p-4 hover:shadow-md transition-all hover:border-primary/30 group"
+                    >
+                      <WrenchIcon className="size-5 text-amber-500 mb-2" />
+                      <h4 className="text-sm font-semibold">智能终端</h4>
+                      <p className="text-xs text-muted-foreground mt-1">命令行工具</p>
+                    </Link>
+                    <Link
+                      href="/tenant-admin"
+                      className="rounded-xl border bg-card p-4 hover:shadow-md transition-all hover:border-primary/30 group"
+                    >
+                      <Server className="size-5 text-emerald-500 mb-2" />
+                      <h4 className="text-sm font-semibold">空间管理</h4>
+                      <p className="text-xs text-muted-foreground mt-1">配置与治理</p>
+                    </Link>
+                  </div>
+                </OverviewSectionCard>
+              </div>
+            )}
           </div>
         </div>
       </WorkspaceBody>
