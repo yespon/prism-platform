@@ -43,8 +43,8 @@ describe("SettingsDialog sections", () => {
 
     render(<SettingsDialog open onOpenChange={vi.fn()} />);
 
-    expect(screen.queryByRole("button", { name: "租户治理" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "租户业务审计" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "工作空间治理" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "工作空间业务审计" })).not.toBeInTheDocument();
   });
 
   it("shows model, tools and skills in personal settings", () => {

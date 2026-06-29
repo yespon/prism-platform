@@ -389,7 +389,7 @@ export function AlertRulesTab() {
           /* 空白导入态 */
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-zinc-200 dark:border-zinc-800 py-16 text-center bg-background/30">
             <SlidersIcon className="h-10 w-10 text-zinc-400" />
-            <h3 className="mt-4 text-sm font-semibold text-zinc-800 dark:text-zinc-200">当前租户未配置任何治理策略</h3>
+            <h3 className="mt-4 text-sm font-semibold text-zinc-800 dark:text-zinc-200">当前工作空间未配置任何治理策略</h3>
             <p className="mt-1.5 text-xs text-muted-foreground max-w-sm leading-relaxed px-4">
               为了防范海量外部告警引发警报风暴，建议初始化系统为您精心预置的三大运维治理规则模版。
             </p>

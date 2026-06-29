@@ -79,12 +79,17 @@ export default function SelectWorkspacePage() {
                   disabled={switchingTo !== null}
                 >
                   <Building2 className="mr-4 h-6 w-6 text-muted-foreground" />
-                  <div className="flex flex-col items-start gap-1">
-                    <span className="font-medium text-base">{tenant.name}</span>
+                  <div className="flex flex-col items-start gap-1 flex-1 min-w-0">
+                    <span className="font-medium text-base truncate">{tenant.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {tenant.slug}
                     </span>
                   </div>
+                  {tenant.tenant_type && (
+                    <span className="ml-2 shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                      {t.admin.tenants.types[tenant.tenant_type as keyof typeof t.admin.tenants.types] ?? tenant.tenant_type}
+                    </span>
+                  )}
                   {switchingTo === tenant.id && (
                     <span className="ml-auto text-sm text-muted-foreground">
                       {t.auth.selectWorkspace.entering}

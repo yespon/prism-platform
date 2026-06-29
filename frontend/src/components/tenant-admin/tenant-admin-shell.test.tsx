@@ -39,7 +39,7 @@ describe("TenantAdminShell", () => {
     );
 
     expect(screen.getByText("管理控制台")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "切换租户" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "切换工作空间" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "用户管理" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "共享 Agent" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "告警规则" })).toBeInTheDocument();

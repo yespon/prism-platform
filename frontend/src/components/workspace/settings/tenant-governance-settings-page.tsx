@@ -80,8 +80,8 @@ export function TenantGovernanceSettingsPage() {
 
   return (
     <SettingsSection
-      title="租户治理"
-      description="租户管理员可在此管理当前工作空间成员。平台管理员不承担租户日常成员运营。"
+      title="工作空间治理"
+      description="工作空间管理员可在此管理当前工作空间成员。平台管理员不承担工作空间日常成员运营。"
       action={
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <UsersIcon className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function TenantGovernanceSettingsPage() {
     >
       {!isTenantAdmin ? (
         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          仅租户管理员可访问该页面。
+          仅工作空间管理员可访问该页面。
         </div>
       ) : (
         <div className="space-y-4">
@@ -147,7 +147,7 @@ export function TenantGovernanceSettingsPage() {
                 ) : members.length === 0 ? (
                   <tr>
                     <td className="px-4 py-6 text-muted-foreground" colSpan={4}>
-                      当前租户暂无成员
+                      当前工作空间暂无成员
                     </td>
                   </tr>
                 ) : (

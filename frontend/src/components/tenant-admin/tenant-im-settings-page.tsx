@@ -181,7 +181,7 @@ export function TenantImSettingsPage() {
             渠道管理
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            配置租户的即时通讯渠道凭证。告警通知、降噪日报等模块将引用此处的推送群组
+            配置工作空间的即时通讯渠道凭证。告警通知、降噪日报等模块将引用此处的推送群组
           </p>
         </div>
 
@@ -310,7 +310,7 @@ export function TenantImSettingsPage() {
           <CardContent className="space-y-6">
             <div>
               <label className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 block mb-2">可用渠道配置</label>
-              <p className="text-[11px] text-muted-foreground mb-4">选择此租户使用的即时通讯渠道，并开启或关闭各个接收端</p>
+              <p className="text-[11px] text-muted-foreground mb-4">选择此工作空间使用的即时通讯渠道，并开启或关闭各个接收端</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {AVAILABLE_CHANNELS.map((ch) => {
                   const active = settings.channels.includes(ch.key);

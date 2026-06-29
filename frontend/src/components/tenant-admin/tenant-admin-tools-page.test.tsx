@@ -98,7 +98,7 @@ describe("TenantAdminToolsPage", () => {
         name: "tenant-tool",
         source: "tenant_shared",
         enabled: false,
-        description: "租户自建工具",
+        description: "工作空间自建工具",
         url: "https://example.com/mcp",
         type: "http",
         command: undefined,
@@ -117,7 +117,7 @@ describe("TenantAdminToolsPage", () => {
     expect(screen.getByText("filesystem")).toBeInTheDocument();
     expect(screen.getByText("tenant-tool")).toBeInTheDocument();
     expect(screen.getByText("内置工具", { selector: "span" })).toBeInTheDocument();
-    expect(screen.getByText("租户自建")).toBeInTheDocument();
+    expect(screen.getByText("工作空间自建")).toBeInTheDocument();
     expect(screen.queryByText("private-tool")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "只读" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "编辑" })).toBeEnabled();
@@ -136,7 +136,7 @@ describe("TenantAdminToolsPage", () => {
         name: "tenant-tool",
         source: "tenant_shared",
         enabled: false,
-        description: "租户自建工具",
+        description: "工作空间自建工具",
         url: "https://example.com/mcp",
         type: "http",
         command: undefined,

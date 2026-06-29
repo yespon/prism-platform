@@ -33,12 +33,12 @@ export function TenantAuditSettingsPage() {
 
   return (
     <SettingsSection
-      title="租户业务审计"
-      description="仅当前租户 tenant_admin 可查看本租户审计事件；平台审计与租户业务审计严格隔离。"
+      title="工作空间业务审计"
+      description="仅当前工作空间 tenant_admin 可查看本工作空间审计事件；平台审计与工作空间业务审计严格隔离。"
     >
       {!isTenantAdmin ? (
         <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-          仅租户管理员可访问该页面。
+          仅工作空间管理员可访问该页面。
         </div>
       ) : (
         <div className="space-y-4">

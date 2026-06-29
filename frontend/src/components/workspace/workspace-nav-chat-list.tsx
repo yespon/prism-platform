@@ -17,6 +17,8 @@ import { useActiveAnnouncements } from "@/core/announcements";
 import { useSession } from "@/core/auth/hooks";
 import { useI18n } from "@/core/i18n/hooks";
 import { canAccessAdminPage } from "@/core/permissions/roles";
+import { useCurrentTenant } from "@/core/tenants";
+import { ROUTE_TYPE_REQUIREMENTS } from "@/core/tenants/route-type-requirements";
 import { cn } from "@/lib/utils";
 
 export function WorkspaceNavChatList() {
@@ -24,12 +26,15 @@ export function WorkspaceNavChatList() {
   const pathname = usePathname();
   const { t } = useI18n();
   const isAdmin = canAccessAdminPage(session?.user?.role);
+  const { data: currentTenant } = useCurrentTenant();
   const { announcements } = useActiveAnnouncements({ limit: 20 });
 
   const unreadAnnouncements = announcements.filter((item) => !item.read_state?.is_read);
   const unreadCount = unreadAnnouncements.length;
 
-  const links = [
+  const tenantType = currentTenant?.tenant_type ?? "ops";
+
+  const allLinks = [
     {
       name: t.sidebarNav.overview,
       href: "/workspace/overview",
@@ -83,6 +88,13 @@ export function WorkspaceNavChatList() {
       ]
       : []),
   ];
+
+  // Filter menu items by workspace type
+  const links = allLinks.filter((link) => {
+    const requiredTypes = ROUTE_TYPE_REQUIREMENTS[link.href];
+    if (!requiredTypes) return true; // visible for all types
+    return requiredTypes.includes(tenantType);
+  });
 
   return (
     <nav className="flex w-full flex-col gap-1 px-2 py-2">

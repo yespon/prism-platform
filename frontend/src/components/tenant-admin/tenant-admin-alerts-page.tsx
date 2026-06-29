@@ -18,7 +18,7 @@ export function TenantAdminAlertsPage() {
           智能告警与治理规则
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          配置并维护租户的第三方告警源 Webhook 接入，并配置实时智能治理规则对异常信号流执行去重、聚合与标记静默。
+          配置并维护工作空间的第三方告警源 Webhook 接入，并配置实时智能治理规则对异常信号流执行去重、聚合与标记静默。
         </p>
       </div>
 

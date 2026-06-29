@@ -1,6 +1,6 @@
 "use client";
 
-import { UserCheckIcon, UserXIcon, ShieldIcon, CheckCircle2Icon, XCircleIcon, PlusIcon, KeyRoundIcon, Trash2Icon, SearchIcon } from "lucide-react";
+import { UserCheckIcon, UserXIcon, ShieldIcon, CheckCircle2Icon, XCircleIcon, PlusIcon, KeyRoundIcon, Trash2Icon, SearchIcon, UserPenIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { useI18n } from "@/core/i18n/hooks";
 
 import { CreateUserDialog } from "./create-user-dialog";
 import { DeleteUserDialog } from "./delete-user-dialog";
+import { EditUserDialog } from "./edit-user-dialog";
 import { ResetUserPasswordDialog } from "./reset-user-password-dialog";
 
 interface AdminUser {
@@ -31,6 +32,7 @@ export default function AdminUsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [resetPasswordOpen, setResetPasswordOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [keyword, setKeyword] = useState("");
 
@@ -80,6 +82,11 @@ export default function AdminUsersPage() {
     setResetPasswordOpen(true);
   };
 
+  const openEditDialog = (user: AdminUser) => {
+    setSelectedUser(user);
+    setEditOpen(true);
+  };
+
   const openDeleteDialog = (user: AdminUser) => {
     if (user.isBootstrapAdmin) {
       alert(t.admin.users.bootstrapDeleteForbidden);
@@ -123,6 +130,13 @@ export default function AdminUsersPage() {
       <ResetUserPasswordDialog
         open={resetPasswordOpen}
         onOpenChange={setResetPasswordOpen}
+        user={selectedUser}
+        onSuccess={() => { void loadUsers(); }}
+      />
+
+      <EditUserDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
         user={selectedUser}
         onSuccess={() => { void loadUsers(); }}
       />
@@ -182,6 +196,15 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-indigo-950/30"
+                        onClick={() => openEditDialog(user)}
+                      >
+                        <UserPenIcon className="size-4 mr-1" />
+                        {t.admin.users.editUser.title}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"

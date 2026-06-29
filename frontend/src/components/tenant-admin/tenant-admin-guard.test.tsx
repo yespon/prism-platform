@@ -30,7 +30,7 @@ describe("TenantAdminGuard", () => {
       </TenantAdminGuard>,
     );
 
-    expect(screen.getByText("正在校验租户权限...")).toBeInTheDocument();
+    expect(screen.getByText("正在校验工作空间权限...")).toBeInTheDocument();
   });
 
   it("redirects non-tenant-admin users", async () => {

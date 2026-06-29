@@ -381,6 +381,55 @@ async def update_user_status(
     )
 
 
+class AdminUpdateUserRequest(BaseModel):
+    name: str
+    email: str
+    role: str
+
+
+@router.put(
+    "/users/{target_user_id}",
+    response_model=AdminUser,
+    dependencies=[Depends(require_platform_admin)],
+)
+async def admin_update_user(
+    req: Request,
+    target_user_id: str,
+    body: AdminUpdateUserRequest,
+) -> AdminUser:
+    now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    try:
+        repo = _get_auth_repo()
+        row = repo.update_user(target_user_id, body.name, body.email, body.role, now)
+    except ValueError as val_err:
+        raise HTTPException(status_code=409, detail=str(val_err))
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to update user: {exc}") from exc
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    record_audit_event(
+        "admin.user.updated",
+        actor_id=req.state.user_id,
+        target_user_id=target_user_id,
+        severity="info",
+        metadata={"name": body.name, "email": body.email, "role": body.role},
+    )
+
+    return AdminUser(
+        id=str(row["id"]),
+        email=row["email"],
+        name=row["name"],
+        role=row["role"] or "user",
+        status=row["status"],
+        createdAt=row["createdAt"],
+        updatedAt=row["updatedAt"],
+    )
+
+
 @router.put(
     "/users/{target_user_id}/password",
     dependencies=[Depends(require_platform_admin)],
@@ -663,6 +712,7 @@ class AdminTenantResponse(BaseModel):
     name: str
     slug: str
     status: str
+    tenant_type: str = "ops"
     created_at: datetime
     member_count: int
     member_summaries: list[AdminTenantMemberSummary] = Field(default_factory=list)
@@ -675,6 +725,7 @@ class AdminCreateTenantRequest(BaseModel):
     slug: str | None = None
     owner_user_id: str
     owner_role: Literal["tenant_admin"] = "tenant_admin"
+    tenant_type: str = "ops"
 
 @router.get("/tenants", response_model=AdminTenantsListResponse, dependencies=[Depends(require_platform_admin)])
 async def list_all_tenants():
@@ -713,6 +764,7 @@ async def list_all_tenants():
                 name=t.name,
                 slug=t.slug,
                 status=t.status,
+                tenant_type=getattr(t, "tenant_type", "ops") or "ops",
                 created_at=t.created_at,
                 member_count=len(members),
                 member_summaries=member_summaries,
@@ -732,7 +784,7 @@ async def admin_create_tenant(req: Request, body: AdminCreateTenantRequest):
     if str(owner.get("role") or "").strip().lower() == "admin":
         raise HTTPException(status_code=400, detail="平台 admin 用户不能作为租户初始用户")
 
-    tenant = await create_tenant(name=body.name, owner_user_id=owner_user_id, slug=body.slug)
+    tenant = await create_tenant(name=body.name, owner_user_id=owner_user_id, slug=body.slug, tenant_type=body.tenant_type)
 
     record_audit_event(
         "platform.tenant.created",
@@ -1052,6 +1104,7 @@ class AdminUpdateTenantRequest(BaseModel):
     name: str | None = None
     slug: str | None = None
     status: str | None = None
+    tenant_type: str | None = None
 
 
 class AdminGlobalModelResponse(BaseModel):
@@ -1143,6 +1196,8 @@ async def admin_update_tenant(tenant_id: str, body: AdminUpdateTenantRequest):
             tenant.slug = body.slug
         if body.status is not None:
             tenant.status = body.status
+        if body.tenant_type is not None:
+            tenant.tenant_type = body.tenant_type
             
         session.add(tenant)
         await session.commit()

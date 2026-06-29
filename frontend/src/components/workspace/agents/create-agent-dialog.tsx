@@ -362,7 +362,7 @@ export function CreateAgentDialog({ open, onOpenChange, onSuccess }: CreateAgent
               <div className="flex items-center gap-4">
                 {isTenantAdmin && (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">共享租户</span>
+                    <span className="text-xs text-muted-foreground">共享工作空间</span>
                     <Switch checked={isShared} onCheckedChange={setIsShared} />
                   </div>
                 )}
@@ -455,7 +455,7 @@ export function CreateAgentDialog({ open, onOpenChange, onSuccess }: CreateAgent
                 </SelectContent>
               </Select>
               <p className="text-[10px] text-muted-foreground leading-normal">
-                不选择则使用租户默认模型
+                不选择则使用工作空间默认模型
               </p>
             </div>
 

@@ -44,7 +44,7 @@ describe("AdminDashboardPage", () => {
 
     expect(screen.getByText("总用户数")).toBeInTheDocument();
     expect(screen.getByText("总线程数")).toBeInTheDocument();
-    expect(screen.getByText("租户总数")).toBeInTheDocument();
+    expect(screen.getByText("工作空间总数")).toBeInTheDocument();
     expect(screen.getByText("平台模型模板数")).toBeInTheDocument();
     expect(screen.getByText("最近审计记录")).toBeInTheDocument();
     expect(screen.getByText("暂无记录")).toBeInTheDocument();

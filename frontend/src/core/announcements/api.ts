@@ -105,6 +105,6 @@ export async function archiveAdminAnnouncement(announcementId: number): Promise<
 
 export async function loadAdminTenantTargets(): Promise<AdminTenantTarget[]> {
   const res = await fetchAuthApi("/api/admin/tenants");
-  const payload = await jsonOrError<{ tenants?: Array<{ id: string; name: string }> }>(res, "加载租户列表失败");
+  const payload = await jsonOrError<{ tenants?: Array<{ id: string; name: string }> }>(res, "加载工作空间列表失败");
   return (payload.tenants ?? []).map((item) => ({ id: item.id, name: item.name }));
 }

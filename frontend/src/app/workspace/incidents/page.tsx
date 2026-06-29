@@ -26,10 +26,13 @@ import {
   WorkspaceBody
 } from "@/components/workspace/workspace-container";
 import { useIncidents, useIncidentStats, getSeverityBadgeStyles, formatDate, type IncidentSummary } from "@/core/alerting";
+import { useWorkspaceTypeGuard } from "@/core/tenants/use-workspace-type-guard";
 
 const PAGE_SIZE = 15;
 
 export default function WorkspaceIncidentsPage() {
+  useWorkspaceTypeGuard();
+
   const [activeTab, setActiveTab] = useState<"firing" | "resolved" | "suppressed">("firing");
   const [severityFilter, setSeverityFilter] = useState<string>("");
   const [serviceQuery, setServiceQuery] = useState<string>("");

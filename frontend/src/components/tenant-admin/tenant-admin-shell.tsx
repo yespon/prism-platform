@@ -5,6 +5,8 @@ import { Bot, Boxes, Building2, Radio, ShieldAlert, ShieldCheck, Users, Wrench }
 import { BackofficeShellLayout } from "@/components/backoffice/backoffice-shell-layout";
 import { useI18n } from "@/core/i18n/hooks";
 import { useCurrentTenant, useSwitchTenant, useTenantList } from "@/core/tenants";
+import { ROUTE_TYPE_REQUIREMENTS } from "@/core/tenants/route-type-requirements";
+import { useWorkspaceTypeGuard } from "@/core/tenants/use-workspace-type-guard";
 
 export function TenantAdminShell({
   children,
@@ -15,7 +17,11 @@ export function TenantAdminShell({
   const { mutate: switchTenant, isPending: switching } = useSwitchTenant();
   const currentTenantId = currentTenant?.tenant_id ?? "";
 
-  const governanceNavItems = [
+  useWorkspaceTypeGuard();
+
+  const tenantType = currentTenant?.tenant_type ?? "ops";
+
+  const allGovernanceNavItems = [
     { href: "/tenant-admin", label: t.tenantAdmin.shell.nav.overview, icon: Building2 },
     { href: "/tenant-admin/members", label: t.tenantAdmin.shell.nav.members, icon: Users },
     { href: "/tenant-admin/models", label: t.tenantAdmin.shell.nav.models, icon: Bot },
@@ -25,6 +31,13 @@ export function TenantAdminShell({
     { href: "/tenant-admin/alerts", label: t.tenantAdmin.shell.nav.alerts, icon: ShieldAlert },
     { href: "/tenant-admin/im", label: "渠道管理", icon: Radio },
   ];
+
+  // Filter nav items by workspace type
+  const governanceNavItems = allGovernanceNavItems.filter((item) => {
+    const requiredTypes = ROUTE_TYPE_REQUIREMENTS[item.href];
+    if (!requiredTypes) return true;
+    return requiredTypes.includes(tenantType);
+  });
 
   const sidebarExtra = (
     <div className="space-y-1">
