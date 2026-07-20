@@ -256,17 +256,20 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     from app.plugins.registry import PLUGIN_DEFINITIONS
 
-    def _plugin_enabled(key: str) -> bool:
-        return get_plugin_states().get(key, True)
-
     def _register_plugin_router(plugin_key: str, *, prefix_override: str | None = None):
         """Import and register a plugin router if the plugin is enabled."""
         if not _plugin_enabled(plugin_key):
             logger.info("Plugin '%s' is disabled — skipping router registration", plugin_key)
             return
-        defn = PLUGIN_DEFINITIONS[plugin_key]
-        mod = __import__(defn.router_import, fromlist=[defn.router_attr])
-        router = getattr(mod, defn.router_attr)
+        defn = PLUGIN_DEFINITIONS.get(plugin_key)
+        if defn is None:
+            raise ValueError(f"Unknown plugin key: {plugin_key!r}")
+        try:
+            mod = __import__(defn.router_import, fromlist=[defn.router_attr])
+            router = getattr(mod, defn.router_attr)
+        except ImportError as e:
+            logger.error("Failed to import router for plugin '%s': %s", plugin_key, e)
+            return
         prefix = prefix_override or defn.router_prefix
         if prefix:
             app.include_router(router, prefix=prefix)
