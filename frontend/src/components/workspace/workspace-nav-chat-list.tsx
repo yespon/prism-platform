@@ -18,6 +18,7 @@ import { useActiveAnnouncements } from "@/core/announcements";
 import { useSession } from "@/core/auth/hooks";
 import { useI18n } from "@/core/i18n/hooks";
 import { canAccessAdminPage } from "@/core/permissions/roles";
+import { usePlugins } from "@/core/plugins/hooks";
 import { useCurrentTenant } from "@/core/tenants";
 import { hasRouteAccess } from "@/core/tenants/route-type-requirements";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function WorkspaceNavChatList() {
   const unreadCount = unreadAnnouncements.length;
 
   const tenantType = currentTenant?.tenant_type ?? "general";
+  const { hiddenNavIds } = usePlugins();
 
   const filesLabel =
     locale === "zh-CN"
@@ -62,6 +64,7 @@ export function WorkspaceNavChatList() {
       href: "/workspace/incidents",
       icon: ShieldAlertIcon,
       active: pathname.startsWith("/workspace/incidents"),
+      navId: "incidents",
     },
     {
       name: t.sidebarNav.skillsPlaza,
@@ -74,6 +77,7 @@ export function WorkspaceNavChatList() {
       href: "/workspace/terminal",
       icon: TerminalSquare,
       active: pathname.startsWith("/workspace/terminal"),
+      navId: "terminal",
     },
     {
       name: filesLabel,
@@ -105,8 +109,13 @@ export function WorkspaceNavChatList() {
       : []),
   ];
 
-  // Filter menu items by workspace type
-  const links = allLinks.filter((link) => hasRouteAccess(link.href, tenantType));
+  // Filter menu items by workspace type and plugin state
+  const links = allLinks.filter((link) => {
+    if (!hasRouteAccess(link.href, tenantType)) return false;
+    // Check if this link's nav ID is hidden by a disabled plugin
+    if (link.navId && hiddenNavIds.has(link.navId)) return false;
+    return true;
+  });
 
   return (
     <nav className="flex w-full flex-col gap-1 px-2 py-2">

@@ -4,6 +4,7 @@ import { Bot, Boxes, Building2, Radio, ShieldAlert, ShieldCheck, Users, Wrench }
 
 import { BackofficeShellLayout } from "@/components/backoffice/backoffice-shell-layout";
 import { useI18n } from "@/core/i18n/hooks";
+import { usePlugins } from "@/core/plugins/hooks";
 import { useCurrentTenant, useSwitchTenant, useTenantList } from "@/core/tenants";
 import { hasRouteAccess } from "@/core/tenants/route-type-requirements";
 import { useWorkspaceTypeGuard } from "@/core/tenants/use-workspace-type-guard";
@@ -20,6 +21,7 @@ export function TenantAdminShell({
   useWorkspaceTypeGuard();
 
   const tenantType = currentTenant?.tenant_type ?? "general";
+  const { hiddenNavIds } = usePlugins();
 
   const allGovernanceNavItems = [
     { href: "/tenant-admin", label: t.tenantAdmin.shell.nav.overview, icon: Building2 },
@@ -32,8 +34,12 @@ export function TenantAdminShell({
     { href: "/tenant-admin/im", label: "渠道管理", icon: Radio },
   ];
 
-  // Filter nav items by workspace type
-  const governanceNavItems = allGovernanceNavItems.filter((item) => hasRouteAccess(item.href, tenantType));
+  // Filter nav items by workspace type and plugin state
+  const governanceNavItems = allGovernanceNavItems.filter((item) => {
+    if (!hasRouteAccess(item.href, tenantType)) return false;
+    if (hiddenNavIds.has(item.href)) return false;
+    return true;
+  });
 
   const sidebarExtra = (
     <div className="space-y-1">
