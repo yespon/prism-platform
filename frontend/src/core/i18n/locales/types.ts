@@ -736,6 +736,7 @@ export interface Translations {
         actions: string;
       };
       types: {
+        general: string;
         ops: string;
         product: string;
         rd: string;
