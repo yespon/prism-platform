@@ -5,7 +5,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 1
+config_version: 2
 
 # ============================================================================
 # Log Level
@@ -111,3 +111,17 @@ checkpointer:
 # checkpointer:
 #   type: postgres
 #   connection_string: postgresql://user:password@localhost:5432/opsintech
+
+# ============================================================================
+# Plugin Configuration
+# ============================================================================
+# Enable or disable optional capability plugins.
+# All plugins default to enabled for backward compatibility.
+# Set enabled: false to disable a plugin (its API routes and UI will be hidden).
+plugins:
+  ops-alerting:
+    enabled: true
+  ops-terminal:
+    enabled: true
+  ops-assets:
+    enabled: true
