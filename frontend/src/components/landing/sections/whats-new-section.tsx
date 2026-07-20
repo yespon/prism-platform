@@ -52,7 +52,7 @@ export function WhatsNewSection({ className }: { className?: string }) {
     <Section
       className={cn("", className)}
       title="What OpsinTech Offers"
-      subtitle="From a single-user Agent to a governed, multi-tenant AI Operations Platform"
+      subtitle="From a single-user Agent to a governed, multi-tenant platform for your digital workforce"
     >
       <div className="flex w-full items-center justify-center">
         <MagicBento data={features} />

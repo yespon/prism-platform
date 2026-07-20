@@ -45,9 +45,9 @@ export function Hero({ className }: { className?: string }) {
               "Multi-Model Access",
               "Role-Based Control",
               "Sandbox Execution",
-              "On-Call Response",
-              "Incident Management",
-              "Workflow Automation",
+              "Digital Workforce",
+              "Skill Marketplace",
+              "Plugin Architecture",
             ]}
           />{" "}
           <div>with OpsinTech</div>
@@ -56,7 +56,7 @@ export function Hero({ className }: { className?: string }) {
           className="mt-8 scale-105 text-center text-2xl text-shadow-sm"
           style={{ color: "rgb(184,184,192)" }}
         >
-          An open-source AI-Native Operations Platform built for teams.
+          An open-source Governed Agent Platform built for teams.
           <br />
           Multi-tenancy, RBAC, audit trails, sandbox execution, and 20+ model
           providers —

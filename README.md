@@ -7,9 +7,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Built on DeerFlow](https://img.shields.io/badge/Built_on-DeerFlow-8A2BE2)](https://github.com/bytedance/deer-flow)
 
-OpsinTech is an **AI-Native Operations Platform for production environments**. v1.0 is built on [DeerFlow](https://github.com/bytedance/deer-flow)'s Agent runtime (ByteDance, GitHub Trending #1), with multi-tenancy, RBAC, audit logging, visual admin dashboards, and database-driven configuration layered on top.
+OpsinTech is a **Governed Agent Platform** — the secure, multi-tenant foundation
+for building and deploying your organization's digital workforce. v1.0 is built
+on [DeerFlow](https://github.com/bytedance/deer-flow)'s Agent runtime (ByteDance,
+GitHub Trending #1), with multi-tenancy, RBAC, audit logging, visual admin
+dashboards, and database-driven configuration layered on top.
 
-> **Our mission: turn AI Agents from impressive demos into governed, enterprise-ready platforms.**
+> **Our mission: enable every organization to safely create, deploy, and manage
+> their own AI agents — governed, auditable, and production-ready.**
 
 ## Table of Contents
 
@@ -37,16 +42,13 @@ A unified workspace with three-tier resource isolation (`user → tenant → glo
 - **Overview** — Dashboard with key metrics and quick actions
 - **Agent Gallery** — Browse and select AI agents for different tasks
 - **Chat Workspace** — Conversational AI interface with artifact management
-- **Terminal Agent** — Governed terminal with AI-assisted command execution, asset management, and approval workflows
 - **Skill Editor** — Create, edit, and test AI Skills with sandbox testing and AI-assisted instruction generation
-- **Incident Management** — Alert ingestion, signal analysis, and incident lifecycle tracking
 
 ### 🤖 Agent Capabilities
 
 | Capability | Description |
 |---|---|
 | **Chat Agent** | Conversational AI with task decomposition, sub-agent parallelism, and artifact generation |
-| **Terminal Agent** | AI-assisted terminal with security governance, command approval, and multi-host asset management |
 | **Skill System** | Reusable AI Skill templates with sandbox testing environment |
 | **MCP Servers** | Configurable MCP servers per tenant (stdio/SSE/HTTP transports) |
 | **Sandbox Execution** | Isolated code execution (local / Docker / Kubernetes modes) |
@@ -57,7 +59,6 @@ A unified workspace with three-tier resource isolation (`user → tenant → glo
 |---|---|
 | **RBAC** | Three-tier roles: `platform_admin` / `tenant_admin` / `tenant_member` |
 | **Audit Trail** | Full operation audit logging with per-tenant isolation |
-| **Terminal Security** | Command approval workflows, credential management, execution audit |
 | **User Management** | Status management (active / suspended), mandatory password rotation |
 
 ### 🌐 Platform Administration
@@ -78,15 +79,18 @@ A unified workspace with three-tier resource isolation (`user → tenant → glo
 
 ## Why OpsinTech Exists
 
-### DeerFlow: A Proven Agent Runtime
+### The Agent Gap
 
-DeerFlow proved that AI Agents can go beyond chat — they can plan, decompose tasks, execute code in isolated sandboxes, and produce real files and deliverables. Sub-agent parallelism, persistent memory, sandbox isolation — these capabilities earned it 37K+ GitHub stars, and deservedly so.
+AI Agents can now plan, decompose tasks, execute code in isolated sandboxes,
+and produce real deliverables. But there's a gap between a single-user Agent
+and a platform ready for teams and organizations — governance, access control,
+auditability, and lifecycle management.
 
-### From Agent Runtime to Production Platform
+### What We Built
 
-DeerFlow excels as an Agent runtime and developer toolkit. OpsinTech builds on top of it to address what teams need when moving from evaluation to production:
+OpsinTech fills that gap. We layer governance on top of a proven Agent runtime:
 
-| Scenario | DeerFlow | OpsinTech Enhancement |
+| Concern | Without OpsinTech | With OpsinTech |
 |---|---|---|
 | **Team Collaboration** | Single-user mode | Multi-tenancy with `user → tenant → global` isolation |
 | **Access Control** | No role-based permissions | RBAC with `platform_admin` / `tenant_admin` / `tenant_member` |
@@ -94,16 +98,13 @@ DeerFlow excels as an Agent runtime and developer toolkit. OpsinTech builds on t
 | **Administration** | Command-line scripts only | Visual admin dashboards for both platform and tenant levels |
 | **Audit & Compliance** | No operation traceability | Full audit trail for all operations, per-tenant isolation |
 | **Skills & MCP** | Functional runtime, manual setup | Per-tenant management via admin UI, lifecycle tracking |
-| **Security Governance** | Basic sandbox isolation | User status management, mandatory password rotation, operation audit |
-| **Onboarding** | Configuration-heavy, steep learning curve | Docker one-command deploy, admin UI-driven setup |
+| **Deployment** | Configuration-heavy, steep learning curve | Docker one-command deploy, admin UI-driven setup |
 
-### Our Approach
+### Optional Vertical Plugins
 
-We're not starting from scratch. DeerFlow's Agent runtime is one of the most mature in open source, and for v1.0 we chose to inherit it — then layer on what teams need to use it in production.
-
-**Short-term (v1.x)**: Keep DeerFlow's runtime, add the governance layer — multi-tenancy, RBAC, audit, admin dashboards, database-backed config, model provider templates.
-
-**Long-term (v2.x+)**: Gradually replace DeerFlow internal dependencies with our own architecture, incorporating real operations scenarios — alert ingestion, incident management, workflow orchestration, governed terminals — to form a true AI-Native Operations Platform.
+The platform core is generic. Vertical capabilities — like alerting &
+incident management, terminal governance, and asset management — ship as
+optional plugins. Enable what you need, hide what you don't.
 
 ## v1.0 — What We Built
 
@@ -120,27 +121,12 @@ We're not starting from scratch. DeerFlow's Agent runtime is one of the most mat
 - Models stored in database, assigned per-tenant, with active / deprecated / retired lifecycle
 - Providers: OpenAI · Anthropic · DeepSeek · Azure OpenAI · Gemini · Ollama · OpenRouter · Groq · Together AI · SiliconFlow · DashScope · Zhipu · Moonshot · MiniMax · Baichuan · 01.AI · Volcengine Ark · Novita AI
 
-### Terminal Agent
-
-- **Governed Terminal Execution**: AI-assisted command execution with security policies
-- **Multi-Host Asset Management**: Register and manage multiple target hosts
-- **Command Approval Workflow**: Security review and approval before execution
-- **Audit Trail**: Every command and its output is logged and auditable
-- **Skill Integration**: Save terminal sessions as reusable Skills
-
 ### Skill System
 
 - **Skill Editor**: Full-featured editor with Markdown instruction editing
 - **AI-Assisted Generation**: Describe what you want, AI generates structured instructions
 - **Sandbox Testing**: Test Skills in a safe mock environment before production use
 - **Per-Tenant Management**: Skills scoped to personal, tenant, or global levels
-
-### Incident Management
-
-- **Alert Ingestion**: Webhook / Alertmanager integration
-- **Signal Analysis**: Raw alerts processed into structured signals
-- **Incident Lifecycle**: Track incidents from creation to resolution
-- **AI Analysis**: Automated incident context assembly and root cause analysis
 
 ### Audit & Security
 
@@ -161,45 +147,61 @@ We're not starting from scratch. DeerFlow's Agent runtime is one of the most mat
 
 ## Our Vision
 
-OpsinTech is not "DeerFlow with a dashboard." We're building a **secure, governed, AI-Native Operations Platform for production environments**.
+OpsinTech is not "DeerFlow with a dashboard." We're building a **secure, governed platform for your organization's digital workforce**.
 
-On this platform, Agents don't just chat and generate code — they operate within boundaries: permission controls, audit records, execution approvals. Starting from Agent conversations, progressively extending into alerting, incidents, workflows, and terminal execution, ultimately forming a complete chain:
+On this platform, Agents don't just chat and generate code — they operate within boundaries: permission controls, audit records, execution approvals. Starting from Agent conversations, progressively extending into workflows, integrations, and observability, ultimately forming a complete chain:
 
 > **Discover → Understand → Decide → Execute → Audit**
 
 This space is almost entirely vacant in open source. That's why we need community voices.
 
-**Who we're looking for**: If you work in operations, security, compliance, or platform engineering, and you're excited by AI Agents but can't use them in production because of missing governance and security — you're exactly who we're building for. Your pain points and suggestions are OpsinTech's roadmap.
+**Who we're looking for**: If you work in engineering, security, compliance, or platform teams, and you're excited by AI Agents but can't use them in production because of missing governance and security — you're exactly who we're building for. Your pain points and suggestions are OpsinTech's roadmap.
 
 ## Roadmap
 
 ```
-✅ v1.0 (Current) — Governable AI Agent Platform
+✅ v1.0 (Current) — Governed Agent Platform
   ├─ Multi-tenancy + RBAC + Audit
   ├─ 20+ model provider templates, database-backed
   ├─ Visual admin dashboards (platform + tenant)
-  ├─ Terminal Agent with security governance
   ├─ Skill System with sandbox testing
   └─ Docker one-command deploy
 
-🔜 v1.1 — Smart Alerting
-  ├─ Webhook / Alertmanager ingestion
-  ├─ Raw Alert → Signal → Incident pipeline
-  ├─ AI-powered summaries and context assembly
-  └─ Incident-to-workspace context linking
+🔜 v1.1 — Platform Slimming & Repositioning
+  ├─ Plugin architecture: ops capabilities → optional plugins
+  ├─ Plugin SPI definition (EventSource, Executor, Notifier)
+  ├─ Narrative pivot: "AI-Native Operations" → "Governed Agent Platform"
+  └─ tenant_type default: "ops" → "general"
 
-🔜 v1.2 — Workflows + Terminal
-  ├─ Event-driven workflow engine
-  ├─ SOP templates (service restart, log collection, health checks)
-  ├─ Governed terminal execution + audit trail
-  └─ Full closed loop: Alert → Incident → Workflow → Terminal → Audit
+🔜 v1.2 — Generic Workflow Engine
+  ├─ Event source abstraction (webhook, cron, file change, message queue)
+  ├─ Workflow orchestration (DAG, conditions, parallel, approval nodes)
+  ├─ Agent as Executor node (Agent Runtime ↔ Workflow Engine coexistence)
+  └─ Full audit closure
 
-📋 v2.0 — Digital Operators & Ecosystem
-  ├─ Custom Agents: SOUL.md + tool_groups whitelist + Skill/Workflow binding
-  ├─ Auto-route alerts to agent operators
-  ├─ Skill marketplace: community contributions + official scenarios
-  ├─ AI Analysis Workbench: data analysis, reports, PPT generation
-  └─ Gradual replacement of DeerFlow internals with our own architecture
+🔜 v1.3 — Digital Employee Framework
+  ├─ Custom Agent: system_prompt templates, tool groups, skill binding, memory
+  ├─ Agent lifecycle: Draft → Sandbox → Publish → Version → Retire
+  ├─ Skill Marketplace Phase 1: Git import + official library + tenant sharing
+  └─ AI Analysis Workbench: data → charts → reports/PPT
+
+📋 v1.4 — Integration & Openness
+  ├─ Open API (REST + Webhook)
+  ├─ Third-party IM integration (Feishu, DingTalk, WeCom, Slack, Teams)
+  ├─ SSO/LDAP
+  └─ Multi-model routing
+
+📋 v1.5 — Observability & Optimization
+  ├─ Agent runtime metrics, workflow analytics
+  ├─ A/B testing for prompts/models
+  └─ Cost attribution (tenant/user/agent/workflow)
+
+📋 v2.0 — Autonomous Runtime + Federated Ecosystem
+  ├─ Self-developed Agent runtime (replace DeerFlow)
+  ├─ Central Skill Registry
+  ├─ Agent Federation (cross-org discovery, auth, billing)
+  ├─ Low-code workflow designer
+  └─ Edge deployment
 ```
 
 ## Quick Start
@@ -322,7 +324,7 @@ MIT License. See [LICENSE](./LICENSE).
 
 v1.0 is built on [DeerFlow](https://github.com/bytedance/deer-flow) (by ByteDance). DeerFlow's Agent runtime — LangGraph orchestration, sub-agent parallelism, sandboxed execution, persistent memory — is one of the best Agent infrastructures in open source. Deep gratitude to the DeerFlow team and community.
 
-**Our relationship with DeerFlow**: In v1.x, we inherit DeerFlow's Agent runtime and add governance. As we evolve, we'll gradually replace internal dependencies and form our own architecture. OpsinTech's long-term identity is not a DeerFlow fork — it's an independent, operations-focused AI-Native platform.
+**Our relationship with DeerFlow**: In v1.x, we inherit DeerFlow's Agent runtime and add governance. As we evolve, we'll gradually replace internal dependencies and form our own architecture. OpsinTech's long-term identity is not a DeerFlow fork — it's an independent, governed agent platform.
 
 ### Open-Source Community
 

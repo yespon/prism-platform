@@ -7,9 +7,9 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 [![Built on DeerFlow](https://img.shields.io/badge/Built_on-DeerFlow-8A2BE2)](https://github.com/bytedance/deer-flow)
 
-OpsinTech 是一个 **面向生产环境的 AI-Native 运维平台**，当前 v1.0 基于 [DeerFlow](https://github.com/bytedance/deer-flow)（字节跳动开源，GitHub Trending #1）的 Agent 运行时构建，在其之上增加了多租户、RBAC 权限、审计日志、可视化管理后台和数据库驱动的配置管理。
+OpsinTech 是一个 **Governed Agent Platform（可治理的 Agent 平台）**——为构建和部署组织的数字员工队伍提供安全、多租户的基础设施。当前 v1.0 基于 [DeerFlow](https://github.com/bytedance/deer-flow)（字节跳动开源，GitHub Trending #1）的 Agent 运行时构建，在其之上增加了多租户、RBAC 权限、审计日志、可视化管理后台和数据库驱动的配置管理。
 
-> **我们的使命：让 AI Agent 从炫酷 Demo 走向企业可治理的生产平台。**
+> **我们的使命：让每个组织都能安全地创建、部署和管理自己的 AI Agent——可治理、可审计、生产就绪。**
 
 ## 目录
 
@@ -37,16 +37,13 @@ OpsinTech 将 AI Agent 转变为可治理的生产平台，具备以下能力：
 - **总览面板** — 关键指标仪表盘与快捷操作入口
 - **Agent 市场** — 浏览和选择不同任务的 AI Agent
 - **对话工作台** — 对话式 AI 交互，支持产物管理
-- **智能终端** — 受控终端，AI 辅助命令执行，资产管理，审批工作流
 - **Skill 编辑器** — 创建、编辑、测试 AI Skill，支持沙盒演练和 AI 辅助指令生成
-- **事件管理** — 告警接入、信号分析、事件生命周期追踪
 
 ### 🤖 Agent 能力
 
 | 能力 | 说明 |
 |---|---|
 | **对话 Agent** | 对话式 AI，支持任务拆解、Sub-Agent 并行、产物生成 |
-| **智能终端 Agent** | AI 辅助终端，安全治理、命令审批、多主机资产管理 |
 | **Skill 系统** | 可复用的 AI Skill 模板，配备沙盒测试环境 |
 | **MCP Server** | 按租户配置 MCP Server（stdio/SSE/HTTP 传输） |
 | **沙盒执行** | 隔离代码执行环境（本地 / Docker / Kubernetes 模式） |
@@ -57,7 +54,6 @@ OpsinTech 将 AI Agent 转变为可治理的生产平台，具备以下能力：
 |---|---|
 | **RBAC 权限** | 三级角色：`platform_admin` / `tenant_admin` / `tenant_member` |
 | **审计日志** | 全操作审计记录，按租户隔离 |
-| **终端安全** | 命令审批工作流、凭证管理、执行审计 |
 | **用户管理** | 状态管理（active / suspended）、强制密码修改 |
 
 ### 🌐 平台管理
@@ -78,15 +74,15 @@ OpsinTech 将 AI Agent 转变为可治理的生产平台，具备以下能力：
 
 ## 为什么有 OpsinTech
 
-### DeerFlow：经过验证的 Agent 运行时
+### Agent 的鸿沟
 
-DeerFlow 证明了 AI Agent 不只停留在聊天框里——它能规划、能拆解任务、能在隔离沙箱里执行代码、能产出真正的文件和工作成果。Sub-Agent 并行编排、持久化 Memory、Sandbox 隔离，这些技术能力让它在一众 Agent 项目中脱颖而出，37K+ GitHub stars 实至名归。
+AI Agent 已经能够规划、拆解任务、在隔离沙箱中执行代码，并产出真实的工作成果。但在单用户 Agent 和面向团队与组织的平台之间，还存在一道鸿沟——治理、访问控制、可审计性和生命周期管理。
 
-### 从 Agent 运行时到生产平台
+### 我们做了什么
 
-DeerFlow 作为 Agent 运行时和开发者工具表现出色。OpsinTech 在此基础上构建，解决团队从评估阶段走向生产环境时所需的能力：
+OpsinTech 填补了这道鸿沟。我们在经过验证的 Agent 运行时之上叠加了治理层：
 
-| 场景 | DeerFlow | OpsinTech 增强 |
+| 维度 | 没有 OpsinTech | 有了 OpsinTech |
 |---|---|---|
 | **团队协作** | 单用户模式 | 多租户，`user → tenant → global` 三层隔离 |
 | **权限控制** | 无角色权限体系 | RBAC：`platform_admin` / `tenant_admin` / `tenant_member` |
@@ -94,16 +90,11 @@ DeerFlow 作为 Agent 运行时和开发者工具表现出色。OpsinTech 在此
 | **平台管理** | 仅命令行脚本 | 可视化管理后台（平台管理 + 租户管理） |
 | **审计合规** | 无操作可追溯性 | 全操作审计日志，按租户隔离 |
 | **Skill 与 MCP** | 运行时可用，手动配置 | 管理后台按租户管理，生命周期追踪 |
-| **安全治理** | 基础沙箱隔离 | 用户状态管理、强制密码修改、操作审计 |
-| **上手体验** | 配置繁琐，学习曲线陡 | Docker 一键部署，管理后台驱动配置 |
+| **部署运维** | 配置繁琐，学习曲线陡 | Docker 一键部署，管理后台驱动配置 |
 
-### 我们的做法
+### 可选的垂直领域插件
 
-我们不是另起炉灶。DeerFlow 的 Agent 运行时是目前开源领域最成熟的之一，我们在 v1.0 阶段选择继承它——然后在上面叠加团队生产使用所需的能力。
-
-**短期（v1.x）**：基于 DeerFlow 的运行时，补上治理层——多租户、RBAC、审计、管理后台、数据库配置、模型接入产品化。
-
-**长期（v2.x+）**：逐步将 DeerFlow 的内部依赖替换为我们自己的架构，融入更多真实运维场景——告警接入、事件管理、工作流编排、受控终端——形成一个真正的 AI-Native 运维平台。
+平台核心是通用的。垂直领域能力——如告警和事件管理、终端治理、资产管理——以可选插件的形式提供。按需启用，按需隐藏。
 
 ## v1.0 — 我们做了什么
 
@@ -120,27 +111,12 @@ DeerFlow 作为 Agent 运行时和开发者工具表现出色。OpsinTech 在此
 - 模型配置存储在数据库，按租户分配，支持 active / deprecated / retired 生命周期管理
 - 厂商覆盖：OpenAI · Anthropic · DeepSeek · Azure OpenAI · Gemini · Ollama · OpenRouter · Groq · Together AI · SiliconFlow · DashScope（百炼）· 智谱 · Moonshot · MiniMax · 百川 · 零一万物 · 火山方舟 · Novita AI
 
-### 智能终端 Agent
-
-- **受控终端执行**：AI 辅助命令执行，配合安全策略管控
-- **多主机资产管理**：注册和管理多个目标主机
-- **命令审批工作流**：执行前安全审查和人工审批
-- **审计留痕**：每条命令及其输出完整记录，可追溯
-- **Skill 集成**：将终端会话保存为可复用的 Skill
-
 ### Skill 系统
 
 - **Skill 编辑器**：功能完整的编辑器，支持 Markdown 指令编辑
 - **AI 辅助生成**：描述你的需求，AI 自动生成结构化执行指令
 - **沙盒测试**：在生产使用前，在安全的模拟环境中测试 Skill
 - **按租户管理**：Skill 作用域支持个人、租户、全局三个级别
-
-### 事件管理
-
-- **告警接入**：Webhook / Alertmanager 集成
-- **信号分析**：原始告警处理为结构化信号
-- **事件生命周期**：追踪事件从创建到解决的全过程
-- **AI 分析**：自动化事件上下文拼装和根因分析
 
 ### 审计与安全合规
 
@@ -161,45 +137,61 @@ DeerFlow 作为 Agent 运行时和开发者工具表现出色。OpsinTech 在此
 
 ## 我们致力于什么
 
-OpsinTech 的目标不是做一个「有后台的 DeerFlow」。我们要做的是一个 **面向生产环境的安全、可治理的 AI-Native 运维平台**。
+OpsinTech 的目标不是做一个「有后台的 DeerFlow」。我们要做的是一个 **安全的、可治理的平台，为组织的数字员工队伍提供基础设施**。
 
-在这个平台上，Agent 不只是能聊天和生成代码——它会被放在一个受管控的环境里：有权限边界、有审计记录、有执行审批。从 Agent 对话开始，逐步延伸到告警、事件、工作流、终端执行，最终形成一条完整的链路：
+在这个平台上，Agent 不只是能聊天和生成代码——它会被放在一个受管控的环境里：有权限边界、有审计记录、有执行审批。从 Agent 对话开始，逐步延伸到工作流、集成、可观测性，最终形成一条完整的链路：
 
 > **发现 → 理解 → 决策 → 执行 → 审计**
 
 这个市场在开源领域几乎是空白。这也是为什么我们需要社区的声音。
 
-**我们在找什么样的人**：如果你在运维、安全、合规、平台工程领域，被 AI Agent 的能力吸引，但又因为缺少治理和安全保障而不敢在生产环境使用——你就是我们要找的人。你的痛点和建议，就是 OpsinTech 的路线图。
+**我们在找什么样的人**：如果你在工程、安全、合规、平台团队，被 AI Agent 的能力吸引，但又因为缺少治理和安全保障而不敢在生产环境使用——你就是我们要找的人。你的痛点和建议，就是 OpsinTech 的路线图。
 
 ## 产品路线图
 
 ```
-✅ v1.0 (当前) — 可治理的 AI Agent 平台
+✅ v1.0 (当前) — Governed Agent Platform（可治理的 Agent 平台）
   ├─ 多租户 + RBAC + 审计
   ├─ 20+ 模型厂商模板，数据库存储
   ├─ 可视化管理后台（平台管理 + 租户管理）
-  ├─ 智能终端 Agent，安全治理
   ├─ Skill 系统，沙盒测试
   └─ Docker 一键部署
 
-🔜 v1.1 — 智能告警
-  ├─ Webhook / Alertmanager 告警接入
-  ├─ Raw Alert → Signal → Incident 处理管线
-  ├─ AI 摘要与上下文拼装
-  └─ 事件到工作台的上下文跳转
+🔜 v1.1 — 平台瘦身与重新定位
+  ├─ 插件架构：运维能力 → 可选插件
+  ├─ 插件 SPI 定义（EventSource, Executor, Notifier）
+  ├─ 叙事转型："AI-Native 运维" → "Governed Agent Platform"
+  └─ tenant_type 默认值："ops" → "general"
 
-🔜 v1.2 — 工作流 + 终端
-  ├─ 事件驱动工作流引擎
-  ├─ SOP 模板（服务重启、日志收集、健康检查）
-  ├─ 受控终端执行 + 审计留痕
-  └─ 完整闭环：告警 → 事件 → 工作流 → 终端 → 审计
+🔜 v1.2 — 通用工作流引擎
+  ├─ 事件源抽象（webhook、cron、文件变更、消息队列）
+  ├─ 工作流编排（DAG、条件、并行、审批节点）
+  ├─ Agent 作为 Executor 节点（Agent 运行时 ↔ 工作流引擎共存）
+  └─ 全链路审计闭环
 
-📋 v2.0 — 数字人与生态
-  ├─ Custom Agent（数字人）：SOUL.md + tool_groups 白名单 + Skill/Workflow 绑定
-  ├─ 告警自动路由到数字人处理
-  ├─ Skill 市场：社区贡献 & 官方场景 Skill
-  ├─ 智能分析台：数据分析、周报、PPT 生成
-  └─ 逐步替换 DeerFlow 内部依赖，形成自有架构
+🔜 v1.3 — 数字员工框架
+  ├─ 自定义 Agent：system_prompt 模板、工具组、Skill 绑定、记忆
+  ├─ Agent 生命周期：草稿 → 沙盒 → 发布 → 版本 → 退役
+  ├─ Skill 市场一期：Git 导入 + 官方库 + 租户共享
+  └─ AI 分析工作台：数据 → 图表 → 报告/PPT
+
+📋 v1.4 — 集成与开放
+  ├─ Open API（REST + Webhook）
+  ├─ 第三方 IM 集成（飞书、钉钉、企业微信、Slack、Teams）
+  ├─ SSO/LDAP
+  └─ 多模型路由
+
+📋 v1.5 — 可观测性与优化
+  ├─ Agent 运行时指标、工作流分析
+  ├─ 提示词/模型 A/B 测试
+  └─ 成本归因（租户/用户/Agent/工作流）
+
+📋 v2.0 — 自主运行时 + 联邦生态
+  ├─ 自研 Agent 运行时（替换 DeerFlow）
+  ├─ 中心化 Skill 注册中心
+  ├─ Agent 联邦（跨组织发现、认证、计费）
+  ├─ 低代码工作流设计器
+  └─ 边缘部署
 ```
 
 ## 快速开始
@@ -331,7 +323,7 @@ docker pull enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-
 
 本项目 v1.0 基于 [DeerFlow](https://github.com/bytedance/deer-flow)（by ByteDance）构建。DeerFlow 的 Agent 运行时——LangGraph 编排、Sub-Agent 并行、Sandbox 执行、持久化 Memory——是当前开源领域最出色的 Agent 基础设施之一。感谢 DeerFlow 团队和社区。
 
-**我们与 DeerFlow 的关系**：v1.0 阶段，我们继承 DeerFlow 的 Agent 运行时并补上治理层。随着版本演进，我们将逐步替换内部依赖，形成自己的架构体系。OpsinTech 的长期定位不是 DeerFlow 的 fork，而是一个独立的、面向生产运维场景的 AI-Native 平台。
+**我们与 DeerFlow 的关系**：v1.0 阶段，我们继承 DeerFlow 的 Agent 运行时并补上治理层。随着版本演进，我们将逐步替换内部依赖，形成自己的架构体系。OpsinTech 的长期定位不是 DeerFlow 的 fork，而是一个独立的、可治理的 Agent 平台。
 
 ### 开源社区
 
