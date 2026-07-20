@@ -7,14 +7,12 @@ from datetime import UTC, datetime, timedelta
 from fastapi import FastAPI
 
 from app.gateway.bootstrap_admin import bootstrap_admin
-from app.gateway.config import get_gateway_config, set_gateway_config
+from app.gateway.config import get_gateway_config, get_plugin_states, set_gateway_config
 from app.gateway.routers import (
     admin,
     agents,
-    alerts,
     announcements,
     artifacts,
-    assets,
     auth as auth_routes,
     channels,
     files,
@@ -28,7 +26,6 @@ from app.gateway.routers import (
     tenants,
     threads,
     uploads,
-    terminal,
 )
 from deerflow.config.app_config import get_app_config
 
@@ -40,6 +37,11 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _plugin_enabled(key: str) -> bool:
+    """Check if a plugin is enabled via config.yaml toggles."""
+    return get_plugin_states().get(key, True)
 
 
 @asynccontextmanager
@@ -107,31 +109,37 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception("No IM channels configured or channel service failed to start")
 
-    # Run raw_alerts cleanup on startup
-    try:
-        from app.alerting.cleanup import cleanup_raw_alerts
-        from deerflow.database.session import get_session_factory
+    # Run raw_alerts cleanup on startup (guarded by ops-alerting plugin)
+    if _plugin_enabled("ops-alerting"):
+        try:
+            from app.alerting.cleanup import cleanup_raw_alerts
+            from deerflow.database.session import get_session_factory
 
-        async with get_session_factory()() as cleanup_session:
-            deleted = await cleanup_raw_alerts(cleanup_session)
-            if deleted:
-                logger.info("Startup cleanup: removed %d old raw_alerts", deleted)
-    except Exception:
-        logger.exception("Raw alert cleanup failed on startup")
+            async with get_session_factory()() as cleanup_session:
+                deleted = await cleanup_raw_alerts(cleanup_session)
+                if deleted:
+                    logger.info("Startup cleanup: removed %d old raw_alerts", deleted)
+        except Exception:
+            logger.exception("Raw alert cleanup failed on startup")
 
-    # Start background tasks
-    digest_task = asyncio.create_task(_run_digest_scheduler())
-    health_task = asyncio.create_task(_run_health_monitor())
+    # Start background tasks (guarded by ops-alerting plugin)
+    if _plugin_enabled("ops-alerting"):
+        digest_task = asyncio.create_task(_run_digest_scheduler())
+        health_task = asyncio.create_task(_run_health_monitor())
+    else:
+        digest_task = None
+        health_task = None
 
     yield
 
-    for task in [digest_task, health_task]:
-        task.cancel()
-    for task in [digest_task, health_task]:
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    if _plugin_enabled("ops-alerting"):
+        for task in [digest_task, health_task]:
+            task.cancel()
+        for task in [digest_task, health_task]:
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     # Stop channel service on shutdown
     try:
@@ -246,6 +254,25 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
     from app.gateway.auth import AuthMiddleware
     app.add_middleware(AuthMiddleware)
 
+    from app.plugins.registry import PLUGIN_DEFINITIONS
+
+    def _plugin_enabled(key: str) -> bool:
+        return get_plugin_states().get(key, True)
+
+    def _register_plugin_router(plugin_key: str, *, prefix_override: str | None = None):
+        """Import and register a plugin router if the plugin is enabled."""
+        if not _plugin_enabled(plugin_key):
+            logger.info("Plugin '%s' is disabled — skipping router registration", plugin_key)
+            return
+        defn = PLUGIN_DEFINITIONS[plugin_key]
+        mod = __import__(defn.router_import, fromlist=[defn.router_attr])
+        router = getattr(mod, defn.router_attr)
+        prefix = prefix_override or defn.router_prefix
+        if prefix:
+            app.include_router(router, prefix=prefix)
+        else:
+            app.include_router(router)
+
     # Include routers
     # Models API is mounted at /api/models
     app.include_router(models.router)
@@ -295,14 +322,14 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Alerting APIs — ingest is unauthenticated (source-level token auth);
     # incident list/detail and source management require normal auth.
-    app.include_router(alerts.router)
+    _register_plugin_router("ops-alerting")
 
     # Terminal websocket API
-    app.include_router(terminal.router, prefix="/api/v1/terminal")
+    _register_plugin_router("ops-terminal", prefix_override="/api/v1/terminal")
 
 
     # Assets Management API
-    app.include_router(assets.router)
+    _register_plugin_router("ops-assets")
 
     # File Center API — unified file and folder management
     app.include_router(files.router)
