@@ -104,6 +104,7 @@ async def test_channel_notification(body: TestNotificationRequest) -> TestNotifi
 
 from fastapi import Depends, Request
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.gateway.authorization import require_tenant_admin, require_tenant_context
@@ -178,8 +179,45 @@ async def update_im_settings(
         config = UserConfig(
             tenant_id=tenant_id,
             user_id="system",
-            app_config={"_im_settings": {}},
+            app_config={"_im_settings": {
+                "enabled": body.enabled,
+                "channels": body.channels,
+                "chat_ids": body.chat_ids,
+            }},
             extensions_config={},
+        )
+        session.add(config)
+        try:
+            await session.commit()
+        except IntegrityError:
+            await session.rollback()
+            # Another request created the row concurrently — re-fetch and update
+            result = await session.exec(
+                select(UserConfig).where(
+                    UserConfig.user_id == "system",
+                    UserConfig.tenant_id == tenant_id,
+                )
+            )
+            config = result.scalars().first()
+            if config is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Failed to create or retrieve IM settings",
+                )
+            app_cfg = dict(config.app_config) if isinstance(config.app_config, dict) else {}
+            app_cfg["_im_settings"] = {
+                "enabled": body.enabled,
+                "channels": body.channels,
+                "chat_ids": body.chat_ids,
+            }
+            config.app_config = app_cfg
+            session.add(config)
+            await session.commit()
+
+        return TenantImSettingsResponse(
+            enabled=body.enabled,
+            channels=body.channels,
+            chat_ids=body.chat_ids,
         )
 
     app_cfg = dict(config.app_config) if isinstance(config.app_config, dict) else {}

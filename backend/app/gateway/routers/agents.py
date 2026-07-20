@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.gateway.authorization import require_tenant_context, _is_tenant_admin
+from app.gateway.config import get_plugin_states
 from app.models.agents import CustomAgent
 from deerflow.config.agents_config import AgentConfig
 from deerflow.config.paths import get_paths
@@ -466,7 +467,6 @@ async def delete_agent(
         raise HTTPException(status_code=403, detail="Only the agent owner can delete this agent")
 
     # Check if any alert sources reference this agent (only when alerting plugin is enabled)
-    from app.gateway.config import get_plugin_states
     if get_plugin_states().get("ops-alerting", True):
         from app.models.alerting import AlertSource
         ref_result = await session.exec(
