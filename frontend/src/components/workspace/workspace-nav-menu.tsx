@@ -68,7 +68,7 @@ export function WorkspaceNavMenu() {
     (tenant) => tenant.id === currentTenant?.tenant_id
   );
   const tenantName = currentTenantDetail?.name ?? currentTenant?.tenant_id ?? t.navMenu.unbound;
-  const tenantType = currentTenant?.tenant_type ?? currentTenantDetail?.tenant_type ?? "ops";
+  const tenantType = currentTenant?.tenant_type ?? currentTenantDetail?.tenant_type ?? "general";
   const canSwitchTenant = (tenants?.length ?? 0) > 1;
   const canAccessTenantAdmin = currentTenant?.role === "tenant_admin";
 
@@ -76,6 +76,7 @@ export function WorkspaceNavMenu() {
     ops: t.admin.tenants.types.ops,
     product: t.admin.tenants.types.product,
     rd: t.admin.tenants.types.rd,
+    general: t.admin.tenants.types.general,
   };
   const typeLabel = typeLabelMap[tenantType] ?? tenantType;
 

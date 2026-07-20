@@ -813,6 +813,7 @@ export const enUS: Translations = {
         actions: "Actions",
       },
       types: {
+        general: "General",
         ops: "Ops",
         product: "Product",
         rd: "R&D",

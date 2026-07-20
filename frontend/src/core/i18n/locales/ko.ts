@@ -811,9 +811,10 @@ export const ko: Translations = {
         actions: "작업",
       },
       types: {
+        general: "일반",
         ops: "운영",
         product: "제품",
-        rd: "연구개발",
+        rd: "R&D",
       },
       members: "멤버",
       memberDetails: "멤버 상세 정보",

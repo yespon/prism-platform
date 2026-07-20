@@ -7,20 +7,21 @@
  * Shared between nav menu filtering and route guards.
  *
  * Type values:
+ *   "general" — 通用空间（默认全功能）
  *   "ops"     — 运维空间（全功能：告警、事件、终端、IM 渠道）
  *   "product" — 产品空间（智能工作台、技能、知识库，无告警/运维）
  *   "rd"      — 研发空间（智能工作台、技能、终端，无告警/运维）
  */
 export const ROUTE_TYPE_REQUIREMENTS: Record<string, string[]> = {
   // 告警与事件管理 — 仅运维
-  "/workspace/incidents": ["ops"],
-  "/tenant-admin/alerts": ["ops"],
+  "/workspace/incidents": ["general", "ops"],
+  "/tenant-admin/alerts": ["general", "ops"],
 
   // IM 渠道管理 — 仅运维（告警通知渠道）
-  "/tenant-admin/im": ["ops"],
+  "/tenant-admin/im": ["general", "ops"],
 
   // 审计日志 — 仅运维
-  "/tenant-admin/audit": ["ops"],
+  "/tenant-admin/audit": ["general", "ops"],
 };
 
 /**

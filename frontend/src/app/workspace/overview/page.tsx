@@ -217,7 +217,7 @@ export default function WorkspaceOverviewPage() {
     select: ["thread_id", "updated_at", "values"],
   });
 
-  const tenantType = currentTenant?.tenant_type ?? "ops";
+  const tenantType = currentTenant?.tenant_type ?? "general";
   const isOps = tenantType === "ops";
 
   // Load real-time incident statistics (only for ops)

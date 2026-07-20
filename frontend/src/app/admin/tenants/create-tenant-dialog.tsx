@@ -37,7 +37,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
   const [slug, setSlug] = useState("");
   const [ownerUserId, setOwnerUserId] = useState("");
   const [ownerUserName, setOwnerUserName] = useState("");
-  const [tenantType, setTenantType] = useState("ops");
+  const [tenantType, setTenantType] = useState("general");
   const [isCustomType, setIsCustomType] = useState(false);
   const [customTypeInput, setCustomTypeInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -163,7 +163,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
       setSlug("");
       setOwnerUserId("");
       setOwnerUserName("");
-      setTenantType("ops");
+      setTenantType("general");
       setIsCustomType(false);
       setCustomTypeInput("");
       setSearchTerm("");
@@ -220,7 +220,7 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
               {t.admin.tenants.createDialog.typeLabel}
             </label>
             <div className="flex gap-2">
-              {(['ops', 'product', 'rd'] as const).map((type) => (
+              {(['general', 'ops', 'product', 'rd'] as const).map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -240,7 +240,8 @@ export function CreateTenantDialog({ open, onOpenChange, onSuccess }: Props) {
                 >
                   {type === 'product' ? t.admin.tenants.types.product :
                    type === 'rd' ? t.admin.tenants.types.rd :
-                   t.admin.tenants.types.ops}
+                   type === 'ops' ? t.admin.tenants.types.ops :
+                   t.admin.tenants.types.general}
                 </button>
               ))}
               <button

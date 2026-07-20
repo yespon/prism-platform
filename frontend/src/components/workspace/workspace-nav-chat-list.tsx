@@ -33,7 +33,7 @@ export function WorkspaceNavChatList() {
   const unreadAnnouncements = announcements.filter((item) => !item.read_state?.is_read);
   const unreadCount = unreadAnnouncements.length;
 
-  const tenantType = currentTenant?.tenant_type ?? "ops";
+  const tenantType = currentTenant?.tenant_type ?? "general";
 
   const filesLabel =
     locale === "zh-CN"

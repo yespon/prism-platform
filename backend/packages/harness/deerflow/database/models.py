@@ -35,7 +35,7 @@ class Tenant(SQLModel, table=True):
     name: str
     slug: str = Field(index=True, unique=True)
     status: str = Field(default="active", index=True)
-    tenant_type: str = Field(default="ops", index=True)
+    tenant_type: str = Field(default="general", index=True)
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC),
         sa_column=Column(DateTime(timezone=True), nullable=False, server_default=func.now()),

@@ -811,6 +811,7 @@ export const ja: Translations = {
         actions: "アクション",
       },
       types: {
+        general: "一般",
         ops: "運用",
         product: "製品",
         rd: "研究開発",

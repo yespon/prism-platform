@@ -800,6 +800,7 @@ export const zhCN: Translations = {
         actions: "操作",
       },
       types: {
+        general: "通用",
         ops: "运维",
         product: "产品",
         rd: "研发",

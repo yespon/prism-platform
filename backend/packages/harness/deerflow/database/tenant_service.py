@@ -72,7 +72,7 @@ async def get_membership(user_id: str, tenant_id: str) -> TenantMembership | Non
         return row
 
 
-async def ensure_default_tenant_for_user(user_id: str, role: str = "member", tenant_type: str = "ops") -> TenantMembership:
+async def ensure_default_tenant_for_user(user_id: str, role: str = "member", tenant_type: str = "general") -> TenantMembership:
     """Ensure user has at least one active tenant membership.
 
     If the user has no active membership, create a personal default tenant and
@@ -244,7 +244,7 @@ async def set_tenant_member_status(tenant_id: str, user_id: str, status: str) ->
         return existing
 
 
-async def create_tenant(name: str, owner_user_id: str, slug: str | None = None, tenant_type: str = "ops") -> Tenant:
+async def create_tenant(name: str, owner_user_id: str, slug: str | None = None, tenant_type: str = "general") -> Tenant:
     """Create a new tenant and assign the user as owner."""
     session_factory = get_session_factory()
     async with session_factory() as session:

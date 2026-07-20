@@ -41,7 +41,7 @@ export function EditTenantDialog({
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState("active");
-  const [tenantType, setTenantType] = useState("ops");
+  const [tenantType, setTenantType] = useState("general");
   const [isCustomType, setIsCustomType] = useState(false);
   const [customTypeInput, setCustomTypeInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -78,8 +78,8 @@ export function EditTenantDialog({
       setName(tenant.name);
       setSlug(tenant.slug);
       setStatus(tenant.status === "active" ? "active" : "inactive");
-      const currentType = tenant.tenant_type || "ops";
-      if (currentType !== "ops" && currentType !== "product" && currentType !== "rd") {
+      const currentType = tenant.tenant_type || "general";
+      if (currentType !== "ops" && currentType !== "product" && currentType !== "rd" && currentType !== "general") {
         setTenantType(currentType);
         setIsCustomType(true);
         setCustomTypeInput(currentType);
@@ -92,7 +92,7 @@ export function EditTenantDialog({
       setName("");
       setSlug("");
       setStatus("active");
-      setTenantType("ops");
+      setTenantType("general");
       setIsCustomType(false);
       setCustomTypeInput("");
     }
@@ -197,7 +197,7 @@ export function EditTenantDialog({
             <div className="grid gap-2">
               <label className="text-sm font-medium">{t.admin.tenants.editDialog.typeLabel}</label>
               <div className="flex gap-2">
-                {(['ops', 'product', 'rd'] as const).map((type) => (
+                {(['general', 'ops', 'product', 'rd'] as const).map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -217,7 +217,8 @@ export function EditTenantDialog({
                   >
                     {type === 'product' ? t.admin.tenants.types.product :
                      type === 'rd' ? t.admin.tenants.types.rd :
-                     t.admin.tenants.types.ops}
+                     type === 'ops' ? t.admin.tenants.types.ops :
+                     t.admin.tenants.types.general}
                   </button>
                 ))}
                 <button

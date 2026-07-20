@@ -21,7 +21,7 @@ export function useWorkspaceTypeGuard() {
   useEffect(() => {
     if (isLoading) return;
 
-    const tenantType = currentTenant?.tenant_type ?? "ops";
+    const tenantType = currentTenant?.tenant_type ?? "general";
 
     if (!hasRouteAccess(pathname, tenantType)) {
       router.replace("/workspace/overview");

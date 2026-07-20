@@ -712,7 +712,7 @@ class AdminTenantResponse(BaseModel):
     name: str
     slug: str
     status: str
-    tenant_type: str = "ops"
+    tenant_type: str = "general"
     created_at: datetime
     member_count: int
     member_summaries: list[AdminTenantMemberSummary] = Field(default_factory=list)
@@ -725,7 +725,7 @@ class AdminCreateTenantRequest(BaseModel):
     slug: str | None = None
     owner_user_id: str
     owner_role: Literal["tenant_admin"] = "tenant_admin"
-    tenant_type: str = "ops"
+    tenant_type: str = "general"
 
 @router.get("/tenants", response_model=AdminTenantsListResponse, dependencies=[Depends(require_platform_admin)])
 async def list_all_tenants():
@@ -764,7 +764,7 @@ async def list_all_tenants():
                 name=t.name,
                 slug=t.slug,
                 status=t.status,
-                tenant_type=getattr(t, "tenant_type", "ops") or "ops",
+                tenant_type=getattr(t, "tenant_type", "general") or "general",
                 created_at=t.created_at,
                 member_count=len(members),
                 member_summaries=member_summaries,

@@ -19,7 +19,7 @@ export function TenantAdminShell({
 
   useWorkspaceTypeGuard();
 
-  const tenantType = currentTenant?.tenant_type ?? "ops";
+  const tenantType = currentTenant?.tenant_type ?? "general";
 
   const allGovernanceNavItems = [
     { href: "/tenant-admin", label: t.tenantAdmin.shell.nav.overview, icon: Building2 },
