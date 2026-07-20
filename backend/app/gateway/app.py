@@ -19,6 +19,7 @@ from app.gateway.routers import (
     mcp,
     memory,
     models,
+    plugins,
     skills,
     suggestions,
     summarization,
@@ -339,6 +340,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Summarization settings API (tenant-admin)
     app.include_router(summarization.router)
+
+    # Plugin info API — exposes enabled/disabled state to frontend
+    app.include_router(plugins.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:
