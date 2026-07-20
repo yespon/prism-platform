@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import FastAPI
 
 from app.gateway.bootstrap_admin import bootstrap_admin
-from app.gateway.config import get_gateway_config
+from app.gateway.config import get_gateway_config, set_gateway_config
 from app.gateway.routers import (
     admin,
     agents,
@@ -63,7 +63,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if plugins_raw is None:
         plugins_raw = {}
     config.plugins = plugins_raw
-    from app.gateway.config import set_gateway_config
     set_gateway_config(config)
 
     try:
