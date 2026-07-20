@@ -57,6 +57,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config = get_gateway_config()
     logger.info(f"Starting API Gateway on {config.host}:{config.port}")
 
+    # Load plugin states from config.yaml (AppConfig has extra="allow")
+    app_cfg = get_app_config()
+    plugins_raw = getattr(app_cfg, "plugins", None)
+    if plugins_raw is None:
+        plugins_raw = {}
+    config.plugins = plugins_raw
+    from app.gateway.config import set_gateway_config
+    set_gateway_config(config)
+
     try:
         import subprocess
         import sys
