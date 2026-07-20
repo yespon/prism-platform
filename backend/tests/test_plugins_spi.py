@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-from typing import assert_type
-
 import pytest
 
 from app.plugins import EventSource, Executor, Notifier
 from app.plugins.registry import (
     PLUGIN_DEFINITIONS,
     PluginDefinition,
-    enabled_plugins,
     load_plugin_config,
 )
 
@@ -95,7 +92,6 @@ class TestPluginDefinition:
         assert p.router_import is None
         assert p.router_attr is None
         assert p.router_prefix is None
-        assert p.lifespan_hooks is False
         assert p.frontend_nav_ids == []
 
     def test_full_definition(self):
@@ -108,14 +104,12 @@ class TestPluginDefinition:
             router_import="app.gateway.routers.test",
             router_attr="router",
             router_prefix="/api/v1/test",
-            lifespan_hooks=True,
             frontend_nav_ids=["test-nav"],
         )
         assert p.default_enabled is False
         assert p.router_import == "app.gateway.routers.test"
         assert p.router_attr == "router"
         assert p.router_prefix == "/api/v1/test"
-        assert p.lifespan_hooks is True
         assert p.frontend_nav_ids == ["test-nav"]
 
 
@@ -136,10 +130,9 @@ class TestPluginDefinitions:
         assert p.name == "Alerting & Incident Management"
         assert p.router_import == "app.gateway.routers.alerts"
         assert p.router_attr == "router"
-        assert p.lifespan_hooks is True
         assert "incidents" in p.frontend_nav_ids
-        assert "tenant-alerts" in p.frontend_nav_ids
-        assert "tenant-im" in p.frontend_nav_ids
+        assert "/tenant-admin/alerts" in p.frontend_nav_ids
+        assert "/tenant-admin/im" in p.frontend_nav_ids
 
     def test_ops_terminal_definition(self):
         """ops-terminal plugin should have correct metadata."""
@@ -149,7 +142,6 @@ class TestPluginDefinitions:
         assert p.router_import == "app.gateway.routers.terminal"
         assert p.router_attr == "router"
         assert p.router_prefix == "/api/v1/terminal"
-        assert p.lifespan_hooks is False
         assert p.frontend_nav_ids == ["terminal"]
 
     def test_ops_assets_definition(self):
@@ -160,7 +152,6 @@ class TestPluginDefinitions:
         assert p.router_import == "app.gateway.routers.assets"
         assert p.router_attr == "router"
         assert p.router_prefix is None
-        assert p.lifespan_hooks is False
         assert p.frontend_nav_ids == []
 
 
@@ -207,38 +198,3 @@ class TestLoadPluginConfig:
         """ops-alerting has default_enabled=True, so it should be enabled by default."""
         result = load_plugin_config({})
         assert result["ops-alerting"] is True
-
-
-# ---------------------------------------------------------------------------
-# enabled_plugins()
-# ---------------------------------------------------------------------------
-
-
-class TestEnabledPlugins:
-    def test_returns_all_plugin_definitions_when_all_enabled(self):
-        """When all plugins are enabled, all definitions should be returned."""
-        states = {"ops-alerting": True, "ops-terminal": True, "ops-assets": True}
-        result = enabled_plugins(states)
-        assert len(result) == 3
-        assert all(isinstance(p, PluginDefinition) for p in result)
-        assert {p.key for p in result} == {"ops-alerting", "ops-terminal", "ops-assets"}
-
-    def test_filters_disabled_plugins(self):
-        """Disabled plugins should not be in the result."""
-        states = {"ops-alerting": True, "ops-terminal": False, "ops-assets": True}
-        result = enabled_plugins(states)
-        assert len(result) == 2
-        assert {p.key for p in result} == {"ops-alerting", "ops-assets"}
-
-    def test_returns_empty_list_when_all_disabled(self):
-        """When all plugins are disabled, an empty list should be returned."""
-        states = {"ops-alerting": False, "ops-terminal": False, "ops-assets": False}
-        result = enabled_plugins(states)
-        assert result == []
-
-    def test_unknown_key_in_states_is_ignored(self):
-        """Unknown keys in plugin_states should be ignored."""
-        states = {"ops-alerting": True, "ops-terminal": True, "ops-assets": True, "unknown": True}
-        result = enabled_plugins(states)
-        assert len(result) == 3
-        assert {p.key for p in result} == {"ops-alerting", "ops-terminal", "ops-assets"}

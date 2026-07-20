@@ -12,10 +12,6 @@ export function usePlugins() {
 
   const plugins: PluginInfo[] = data?.plugins ?? [];
 
-  const isPluginEnabled = (key: string): boolean => {
-    return plugins.find((p) => p.key === key)?.enabled ?? true;
-  };
-
   const hiddenNavIds = new Set<string>();
   for (const p of plugins) {
     if (!p.enabled) {
@@ -25,5 +21,5 @@ export function usePlugins() {
     }
   }
 
-  return { plugins, isPluginEnabled, hiddenNavIds, isLoading, error };
+  return { plugins, hiddenNavIds, isLoading, error };
 }

@@ -18,8 +18,7 @@ class PluginDefinition:
     router_import: str | None = None       # e.g. "app.gateway.routers.alerts"
     router_attr: str | None = None         # e.g. "router"
     router_prefix: str | None = None       # e.g. "/api"
-    lifespan_hooks: bool = False            # Whether app.py lifespan references this plugin
-    frontend_nav_ids: list[str] = field(default_factory=list)  # e.g. ["incidents", "terminal"]
+    frontend_nav_ids: list[str] = field(default_factory=list)  # e.g. ["incidents", "/tenant-admin/alerts"]
 
 
 # ---------------------------------------------------------------------------
@@ -34,8 +33,7 @@ PLUGIN_DEFINITIONS: dict[str, PluginDefinition] = {
         router_import="app.gateway.routers.alerts",
         router_attr="router",
         router_prefix=None,
-        lifespan_hooks=True,
-        frontend_nav_ids=["incidents", "tenant-alerts", "tenant-im"],
+        frontend_nav_ids=["incidents", "/tenant-admin/alerts", "/tenant-admin/im"],
     ),
     "ops-terminal": PluginDefinition(
         key="ops-terminal",
@@ -44,7 +42,6 @@ PLUGIN_DEFINITIONS: dict[str, PluginDefinition] = {
         router_import="app.gateway.routers.terminal",
         router_attr="router",
         router_prefix="/api/v1/terminal",
-        lifespan_hooks=False,
         frontend_nav_ids=["terminal"],
     ),
     "ops-assets": PluginDefinition(
@@ -54,7 +51,6 @@ PLUGIN_DEFINITIONS: dict[str, PluginDefinition] = {
         router_import="app.gateway.routers.assets",
         router_attr="router",
         router_prefix=None,
-        lifespan_hooks=False,
         frontend_nav_ids=[],
     ),
 }
@@ -81,12 +77,3 @@ def load_plugin_config(raw_config: dict[str, Any] | None) -> dict[str, bool]:
         else:
             result[key] = defn.default_enabled
     return result
-
-
-def enabled_plugins(plugin_states: dict[str, bool]) -> list[PluginDefinition]:
-    """Return PluginDefinition list for enabled plugins."""
-    return [
-        PLUGIN_DEFINITIONS[key]
-        for key, enabled in plugin_states.items()
-        if enabled and key in PLUGIN_DEFINITIONS
-    ]

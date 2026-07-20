@@ -146,6 +146,26 @@ async def get_im_settings(
     app_cfg = config.app_config if config else {}
     im_cfg = app_cfg.get("_im_settings", {}) if isinstance(app_cfg, dict) else {}
 
+    # Fallback: if no _im_settings in UserConfig, try old AlertingSettings table
+    if not im_cfg.get("channels") and not im_cfg.get("chat_ids"):
+        try:
+            from app.models.alerting import AlertingSettings
+
+            result = await session.exec(
+                select(AlertingSettings).where(AlertingSettings.tenant_id == tenant_id)
+            )
+            alert_settings = result.scalars().first()
+            if alert_settings and alert_settings.notification_config:
+                nc = alert_settings.notification_config
+                if nc.get("enabled") is not None:
+                    im_cfg["enabled"] = nc["enabled"]
+                if nc.get("channels"):
+                    im_cfg["channels"] = nc["channels"]
+                if nc.get("chat_ids"):
+                    im_cfg["chat_ids"] = nc["chat_ids"]
+        except ImportError:
+            pass  # AlertingSettings not available (plugin disabled)
+
     return TenantImSettingsResponse(
         enabled=im_cfg.get("enabled", False),
         channels=im_cfg.get("channels", []),
