@@ -107,7 +107,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.gateway.authorization import require_tenant_admin, require_tenant_context
-from app.models.alerting import AlertingSettings
+from deerflow.database.models import UserConfig
 from deerflow.database.session import get_session
 
 im_settings_router = APIRouter(prefix="/api/tenant-im", tags=["tenant-im"])
@@ -136,15 +136,19 @@ async def get_im_settings(
 ) -> TenantImSettingsResponse:
     tenant_id = require_tenant_context(request)
     result = await session.exec(
-        select(AlertingSettings).where(AlertingSettings.tenant_id == tenant_id)
+        select(UserConfig).where(
+            UserConfig.user_id == "system",
+            UserConfig.tenant_id == tenant_id,
+        )
     )
-    settings = result.scalars().first()
-    cfg = settings.notification_config if settings else {}
+    config = result.scalars().first()
+    app_cfg = config.app_config if config else {}
+    im_cfg = app_cfg.get("_im_settings", {}) if isinstance(app_cfg, dict) else {}
 
     return TenantImSettingsResponse(
-        enabled=cfg.get("enabled", False),
-        channels=cfg.get("channels", []),
-        chat_ids=cfg.get("chat_ids", {}),
+        enabled=im_cfg.get("enabled", False),
+        channels=im_cfg.get("channels", []),
+        chat_ids=im_cfg.get("chat_ids", {}),
     )
 
 
@@ -163,26 +167,30 @@ async def update_im_settings(
     tenant_id = require_tenant_admin(request)
 
     result = await session.exec(
-        select(AlertingSettings).where(AlertingSettings.tenant_id == tenant_id)
+        select(UserConfig).where(
+            UserConfig.user_id == "system",
+            UserConfig.tenant_id == tenant_id,
+        )
     )
-    settings = result.scalars().first()
+    config = result.scalars().first()
 
-    if settings is None:
-        import uuid
-        settings = AlertingSettings(
-            id=str(uuid.uuid4()),
+    if config is None:
+        config = UserConfig(
             tenant_id=tenant_id,
-            notification_config={},
+            user_id="system",
+            app_config={"_im_settings": {}},
+            extensions_config={},
         )
 
-    # Merge: only update channel keys, preserve alerting keys
-    cfg = dict(settings.notification_config or {})
-    cfg["enabled"] = body.enabled
-    cfg["channels"] = body.channels
-    cfg["chat_ids"] = body.chat_ids
-    settings.notification_config = cfg
+    app_cfg = dict(config.app_config) if isinstance(config.app_config, dict) else {}
+    app_cfg["_im_settings"] = {
+        "enabled": body.enabled,
+        "channels": body.channels,
+        "chat_ids": body.chat_ids,
+    }
+    config.app_config = app_cfg
 
-    session.add(settings)
+    session.add(config)
     await session.commit()
 
     return TenantImSettingsResponse(

@@ -465,21 +465,23 @@ async def delete_agent(
     if agent.user_id != "tenant-shared" and agent.user_id != user_id:
         raise HTTPException(status_code=403, detail="Only the agent owner can delete this agent")
 
-    # Check if any alert sources reference this agent
-    from app.models.alerting import AlertSource
-    ref_result = await session.exec(
-        sa_select(AlertSource).where(
-            AlertSource.tenant_id == tenant_id,
-            AlertSource.config_json["analysis_trigger"]["diagnosis_agent_id"].as_string() == agent.id,
+    # Check if any alert sources reference this agent (only when alerting plugin is enabled)
+    from app.gateway.config import get_plugin_states
+    if get_plugin_states().get("ops-alerting", True):
+        from app.models.alerting import AlertSource
+        ref_result = await session.exec(
+            sa_select(AlertSource).where(
+                AlertSource.tenant_id == tenant_id,
+                AlertSource.config_json["analysis_trigger"]["diagnosis_agent_id"].as_string() == agent.id,
+            )
         )
-    )
-    ref_sources = ref_result.scalars().all()
-    if ref_sources:
-        source_names = ", ".join(s.name for s in ref_sources)
-        raise HTTPException(
-            status_code=409,
-            detail=f"无法删除：告警源 ({source_names}) 正在使用此 Agent。请先在告警源中解除绑定后再删除。"
-        )
+        ref_sources = ref_result.scalars().all()
+        if ref_sources:
+            source_names = ", ".join(s.name for s in ref_sources)
+            raise HTTPException(
+                status_code=409,
+                detail=f"无法删除：告警源 ({source_names}) 正在使用此 Agent。请先在告警源中解除绑定后再删除。"
+            )
 
     await session.delete(agent)
     await session.commit()
