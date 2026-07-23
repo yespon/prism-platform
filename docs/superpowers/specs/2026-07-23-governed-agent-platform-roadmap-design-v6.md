@@ -43,7 +43,7 @@ To prevent scope creep, these are explicitly out of scope for all versions:
 
 ### 1.4 Strategic Pivot
 
-v1.1 completed the "de-ops" transition. v1.2 extracts the Agent Loop as a standalone primitive — the first step toward v2.0's autonomous runtime. v1.3 builds the workflow engine. v1.4 introduces the compliance layer. v1.5 delivers the digital employee framework and extension system. v1.6 adds the data connector layer. v1.7 adds enterprise security, session DAG, and multi-run modes. v1.8 establishes context engineering. v1.9 adds evaluation, SRE governance, and feedback loops. v2.0 achieves architectural independence with identity mesh and federation.
+v1.1 completed the "de-ops" transition. v1.2 extracts the Agent Loop as an abstraction layer over LangGraph (decoupling, not replacement) — the first step toward v2.0's autonomous runtime. v1.3 builds the workflow engine. v1.4 introduces the compliance layer. v1.5 delivers the digital employee framework and extension system. v1.6 adds the data connector layer. v1.7 adds enterprise security, session DAG, multi-run modes, and removes the DeerFlow loop. v1.8 establishes context engineering. v1.9 adds evaluation, SRE governance, and feedback loops. v2.0 replaces LangGraph entirely, achieving architectural independence with identity mesh and federation.
 
 **Key change from v5**: Overloaded versions (v1.2 with 9 P0s, v1.4 with 9 P0s, v1.6 with 10 P0s) have been split into focused, deliverable increments. Each version now targets 3-8 P0 items.
 
@@ -69,7 +69,7 @@ These are planning assumptions, not commitments. Actual velocity depends on team
 
 | Source | Key Insight Adopted | Roadmap Impact |
 |--------|-------------------|----------------|
-| **Pi-Agent (64K+ Stars)** | Three-layer architecture; Agent Loop as standalone primitive; five-lever extension system; skills lazy-loading; session DAG; four run modes | v1.2 Agent Loop + Tool Registry; v1.5 extension system; v1.7 session DAG + multi-run modes; v1.8 context compression |
+| **Pi-Agent (64K+ Stars)** | Three-layer architecture; Agent Loop abstraction layer; five-lever extension system; skills lazy-loading; session DAG; four run modes | v1.2 Agent Loop + Tool Registry; v1.5 extension system; v1.7 session DAG + multi-run modes; v1.8 context compression |
 | **Microsoft Agent Governance Toolkit** | Governance at deterministic code layer; Policy-as-Code (YAML); OWASP Top 10; Merkle-tree audit; MCP security gateway; Saga; kill switch; SLO/error budgets; identity mesh (SPIFFE/DID/mTLS) | v1.3 Saga + kill switch; v1.4 compliance layer; v1.5 marketplace trust; v1.9 SRE governance; v2.0 identity mesh |
 | NVIDIA Enterprise AI Factory | Two-phase security (perimeter + runtime); capability tokens; GitOps-driven agent config; default-deny outbound | v1.7 runtime security; v1.7 Agent as Code |
 | Google Gemini Managed Agents | Dual-plane API (Control Plane / Data Plane); A2A protocol; four-tier stack | v1.5 A2A protocol |
@@ -135,7 +135,7 @@ Each version lists capabilities with priority tags:
 
 ### v1.2 — Agent Loop Primitive
 
-**Focus**: Extract the Agent Loop from DeerFlow as a standalone module. This is the first step toward v2.0's autonomous runtime. No workflow engine yet — that comes in v1.3.
+**Focus**: Extract the Agent Loop as an abstraction layer over LangGraph, decoupling platform code from DeerFlow-specific APIs. This is the first step toward v2.0's autonomous runtime (which replaces LangGraph entirely). No workflow engine yet — that comes in v1.3. Note: v1.2 is decoupling, not independence from LangGraph.
 
 | Priority | Scope | Content |
 |----------|-------|---------|
@@ -231,7 +231,7 @@ v2.0: LangGraph orchestration replaced; DeerFlow dependency fully removed
 | Duration | Minutes to hours | Hours to days |
 | State | In-memory (checkpoint) | Database persistent, recoverable |
 | Human Intervention | In-conversation (v1.7+) | Async approval nodes, suspend/resume |
-| Cross-System | None | Saga pattern, compensating rollback |
+| Cross-System | None | Saga pattern, idempotent retry + selective compensation |
 | Failure Recovery | Restart = lost context | Resume from database state |
 | Audit | Single conversation | Full-chain, replayable |
 | Deployment | Standalone SDK or platform-embedded | Requires platform infrastructure |
@@ -804,7 +804,7 @@ REST/GraphQL APIs →  │ API Connector            │
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | Agent Loop extraction | v1.2: abstraction layer over LangGraph (decoupling). v1.3: becomes default. v1.7: DeerFlow loop removed. v2.0: LangGraph replaced entirely. | Gradual decoupling→replacement; v1.2 is NOT independence from LangGraph, only decoupling |
-| Workflow engine | Self-developed DAG + Saga; Agent Loop as execution unit | Keep orchestration controllable; Agent Loop is independent of Workflow |
+| Workflow engine | Self-developed DAG + Saga (idempotent retry + selective compensation); Agent Loop as execution unit | Keep orchestration controllable; Agent Loop is decoupled from (not independent of) Workflow |
 | Agent Loop vs Workflow | Coexistence, not competition | Agent = "employee", Workflow = "project manager" |
 | Governance model | Three-layer: Perimeter (v1.0) + Compliance (v1.4) + Runtime (v1.7) | Defense in depth; NVIDIA + Microsoft AGT |
 | Policy enforcement | Deterministic code-level interception; always-on builtin, not optional plugin | Microsoft AGT: "Model-layer defenses are probabilistic" |
@@ -836,7 +836,7 @@ REST/GraphQL APIs →  │ API Connector            │
 | Agent Loop extraction breaks DeerFlow integration | Agent execution fails during transition | Parallel run with feature-flag toggle; automated comparison testing; v1.3 Agent Loop becomes default; v1.7 DeerFlow loop removed |
 | Policy engine performance overhead | Tool-call latency increase | Deterministic (no LLM call); target <1ms overhead; Rust core option for hot path |
 | Extension system complexity | Five levers may overwhelm users | Each lever independently usable; start with Plugins + Skills (v1.1/v1.5), add Hooks incrementally |
-| Workflow engine and Agent Loop state inconsistency | Agent executing when Workflow restarts | Workflow only stores "invocation handle"; Agent Loop state managed independently; Saga compensates |
+| Workflow engine and Agent Loop state inconsistency | Agent executing when Workflow restarts | Workflow only stores "invocation handle"; Agent Loop state managed independently; Saga retries/compensates |
 | Skill lazy-loading breaks cross-skill references | Skill A's instructions reference Skill B's tools | v1.5 auto-detects cross-skill tool references; existing skills preload by default; v1.7 all lazy |
 | Context engineering scope creep | v1.8 becomes overloaded | Only 4 P0s defined; compression engine, token monitor, memory strategy, window management |
 | Data connector security | Tenant data leakage | Per-tenant vector store isolation; Text-to-SQL logged and schema-access controlled; Policy engine wraps all data access |
@@ -852,8 +852,8 @@ REST/GraphQL APIs →  │ API Connector            │
 ```
 v1.0 → v1.1: Zero migration, ops plugins enabled by default, behavior unchanged.
 
-v1.1 → v1.2: Agent Loop extracted as standalone module (parallel to existing DeerFlow loop, feature-flag toggle).
-              Tool Registry + Message System are additive. Default: DeerFlow loop. Opt-in: Agent Loop.
+v1.1 → v1.2: Agent Loop extracted as abstraction layer over LangGraph (parallel to existing DeerFlow loop, feature-flag toggle).
+              Tool Registry + Message System are additive. Default: DeerFlow loop. Opt-in: Agent Loop abstraction.
 
 v1.2 → v1.3: Agent Loop becomes default; DeerFlow loop marked deprecated.
               Workflow engine, Saga, kill switch, circuit breaker are additive.
@@ -902,7 +902,7 @@ v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already 
 |---------|-----------|-------------|-----------|
 | v1.1 | Plugin toggle test pass rate 100%; README narrative published | Plugin toggle latency <10ms | — |
 | v1.2 | Agent Loop operates independently of DeerFlow; comparison tests pass | Agent Loop latency parity with DeerFlow (±5%) | First external contributor PR merged |
-| v1.3 | 5 workflow templates; 1000 concurrent workflows; Saga rollback verified; kill switch stops workflows within 5s | Workflow step transition <100ms | — |
+| v1.3 | 5 workflow templates; 1000 concurrent workflows; Saga idempotent retry + selective compensation verified; kill switch stops workflows within 5s | Workflow step transition <100ms | — |
 | v1.4 | OWASP Top 10 compliance coverage 100%; tamper-evident audit verified | Policy evaluation <1ms per tool call | — |
 | v1.5 | 20+ skills in official library; 5 extension levers operational; trust scoring visible (if P1 delivered) | Skill lazy-load <500ms | Monthly active tenants > baseline |
 | v1.6 | PG connector operational; RAG pipeline with hybrid search + reranking | RAG retrieval <2s p95 | — |
@@ -944,11 +944,11 @@ v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already 
 | **Data Flywheel** | Feedback → sample collection → prompt/model refinement → redeployment → more feedback |
 | **Policy as Code** | Declarative YAML policies defining agent behavior boundaries; version-controlled, reviewable, GitOps-friendly |
 | **Decision BOM** | Bill of Materials for every governance decision: active policy, agent request, allow/deny reason — cryptographically verifiable |
-| **Saga** | Distributed transaction pattern: each step has a compensating action; failures trigger rollback of completed steps |
+| **Saga** | Idempotent retry + selective compensation pattern. Each step has idempotent retry with exponential backoff; steps with reversible side effects (e.g., sent notifications) support compensating rollback; steps with irreversible side effects (e.g., executed SQL) support retry only. Most Agent workflow steps support retry, not compensation. |
 | **Identity Mesh** | SPIFFE/DID/mTLS-based identity layer answering "Which agent did this?" with cryptographic certainty |
 | **Kill Switch** | Emergency stop mechanism. v1.3: infrastructure-level (workflow/tenant). v1.9: extended to per-agent granularity. |
 | **Circuit Breaker** | Auto-throttle mechanism. v1.3: failure-count-based. v1.9: extended to SLO-driven. |
-| **Agent Loop** | The think→act→observe→think cycle that is the core of any Agent. A standalone, reusable primitive independent of orchestration framework. |
+| **Agent Loop** | The think→act→observe→think cycle that is the core of any Agent. In v1.2–v1.7, it is an abstraction layer over LangGraph (decoupling platform code from LangGraph-specific APIs). In v2.0, LangGraph is replaced by an autonomous runtime, making the Agent Loop truly independent of any orchestration framework. |
 | **Progressive Disclosure** | Skills load metadata (name + description) eagerly, full instructions + tools only when invoked. Reduces context pollution. |
 | **Session DAG** | Non-linear conversation structure: fork at any point, explore alternatives, keep or discard branches. Sessions are graphs, not lists. Persistent storage — survives process restart. |
 
