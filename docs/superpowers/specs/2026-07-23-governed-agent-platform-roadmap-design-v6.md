@@ -251,7 +251,7 @@ Workflow: Trigger → Step1(HTTP) → Step2(Agent) → Step3(Approve) → Step4(
 | Priority | Scope | Content |
 |----------|-------|---------|
 | **P0** | **Policy Engine (Builtin)** | **Deterministic tool-call interception engine. Always on — not optional, not a plugin. Policy strictness is configurable; the engine itself is not.** |
-| **P0** | **Policy as Code** | **YAML-based declarative policies. `default_action: deny` with explicit `allow` rules.** |
+| **P0** | **Policy as Code** | **YAML-based declarative policies. `default_action: deny` with explicit `allow` rules. Supports `risk_tier` field per rule: `low` (auto-allow, e.g., read-only queries — avoids approval fatigue), `medium` (require_approval, e.g., write operations), `high` (deny unless explicitly approved, e.g., destructive ops). Rationale: Pi-Agent warns that per-call approval becomes "security theater"; tiered auto-allow for low-risk operations balances governance with usability.** |
 | **P0** | **OWASP Agentic AI Top 10** | **Built-in compliance rule set covering all 10 categories. Enabled by default for high-severity rules.** |
 | **P0** | **Tamper-Evident Audit Log** | **Merkle-tree structured audit trail. Decision BOM (active policy, agent request, allow/deny reason).** |
 | **P1** | Policy Lint & Validation | Static analysis of policy files — catch misconfigurations before deployment. |
@@ -268,13 +268,16 @@ rules:
   - name: allow-read-only-db
     condition: "tool_name == 'db_query' && action == 'SELECT'"
     action: allow
+    risk_tier: low          # auto-allow; avoids approval fatigue
   - name: require-approval-write
     condition: "tool_name == 'db_query' && action in ['INSERT', 'UPDATE', 'DELETE']"
     action: require_approval
     approvers: ["tenant_admin"]
+    risk_tier: medium
   - name: deny-external-network
     condition: "tool_name == 'http_request' && !target_host.endswith('.internal')"
     action: deny
+    risk_tier: high
 ```
 
 **Policy Engine is always-on — migration strategy:**
@@ -304,7 +307,7 @@ SDK deployment modes (Embedded / Remote) are defined in v1.7 when the SDK is int
 |----------|-------|---------|
 | **P0** | Custom Agent Enhancement | system_prompt templating (variable injection) + tool group whitelisting + skill binding + memory policy configuration |
 | **P0** | Agent Lifecycle | Draft → Sandbox test → Publish → Version management → Usage statistics → Retirement |
-| **P0** | **Prompt Template System** | **Variable injection, version management, per-tenant defaults, slash-command loadable, reusable markdown templates. Delivered as a complete system — not fragmented across versions.** |
+| **P0** | **Prompt Template System** | **Variable injection, version management, per-tenant defaults, slash-command loadable, reusable markdown templates. Includes prompt budget (token cap on system prompts; auto-downgrade or split when exceeded). Rationale: Pi-Agent achieves TerminalBench #2 with ~90-word system prompts vs Claude Code's tens of thousands of tokens — purer context yields better reasoning. Delivered as a complete system — not fragmented across versions.** |
 | **P0** | **Extension System** | **Five-lever architecture: Builtin SPIs, Extension SPIs, Event Hooks, Skills (lazy-load), Prompt Templates** |
 | **P0** | **Skill Lazy Loading** | **Progressive disclosure — metadata always visible, full instructions + tools loaded only on invocation.** |
 | **P0** | Skill Marketplace Phase 1 | Git repository import + Official skill library + Tenant-internal sharing |
@@ -328,7 +331,25 @@ SDK deployment modes (Embedded / Remote) are defined in v1.7 when the SDK is int
 | **Extension SPIs** | EventSource, Executor, Notifier, DataConnector | Via config toggle | Built-in registry |
 | **Event Hooks** | Agent lifecycle hooks: `tool_call_before/after`, `turn_start/end`, `error`, `session_start/end` | Hot reload | Extension packages |
 | **Skills** | Lazy-loaded "instruction + tools" packs. Progressive disclosure. Metadata always visible, full content on invocation. | Hot reload | Git import + marketplace |
-| **Prompt Templates** | Reusable markdown templates with parameter substitution. Slash-command loadable. Version-controlled. Variable injection, version management, per-tenant defaults. | Hot reload | Template marketplace |
+| **Prompt Templates** | Reusable markdown templates with parameter substitution. Slash-command loadable. Version-controlled. Variable injection, version management, per-tenant defaults. Prompt budget enforced. | Hot reload | Template marketplace |
+
+**Hot reload mechanism (two modes):**
+
+```
+Development mode (local):
+  ├─ File-system watcher detects extension/skill/template changes
+  ├─ Changes apply to running sessions immediately, no restart
+  └─ No audit required (developer's own environment)
+
+Runtime mode (production):
+  ├─ Changes applied via admin API (POST /api/extensions/reload)
+  ├─ Requires tenant_admin or platform_admin permission
+  ├─ Every reload audited (who, what, when, before/after diff)
+  └─ Policy Engine policies themselves can only be reloaded by platform_admin
+     (governance changes are high-risk, not tenant-self-service)
+```
+
+Rationale: Pi-Agent's hot reload applies changes to running sessions immediately. Enterprise scenarios require the same developer ergonomics but with permission control and audit — a developer's hot reload is a admin's audited config change.
 
 **Prompt Template delivery:**
 
@@ -561,8 +582,10 @@ v1.7 upgrade:
 | **P0** | Workflow Analytics | Bottleneck identification, failure hotspots, optimization suggestions |
 | **P0** | **Evaluation Framework** | **Offline eval (test suites), online eval (production sampling), human annotation pipeline** |
 | **P0** | **Feedback Loop** | **User rating → auto sample collection → prompt/model iteration** |
+| **P1** | **Agent Self-Refinement** | **Agent adjusts its own prompt/skill config based on feedback signals. All self-modifications must pass Policy Engine approval before activation (prevents governance bypass via self-editing). Rationale: Pi-Agent enables "agents modify their own capabilities"; this aligns with Data Flywheel but requires governance gate — an agent editing itself is high-risk and must be intercepted.** |
 | **P0** | A/B Testing | Compare different prompts/models/processes, data-driven iteration |
 | **P0** | Cost Attribution | Tenant/user/agent/workflow four-level cost allocation, budget alerts with auto circuit-breaker |
+| **P1** | **OpsinTech Benchmark Suite** | **Standard task set covering governance, workflow, data connector scenarios. Used for cross-version regression testing (like Pi-Agent's TerminalBench, but enterprise-scoped). Target: 50+ benchmark tasks by v1.9 ship.** |
 | **P1** | **SLO & Error Budgets** | **Per-agent SLO (latency p95, success rate, token efficiency). Budget exhaustion → auto-degradation.** |
 | **P1** | **Chaos Testing** | **Agent fault injection, tool timeout simulation, model hallucination testing, network partition drills** |
 | **P1** | **Kill Switch (Per-Agent)** | **Extends v1.3 infrastructure kill switch to per-agent granularity.** |
