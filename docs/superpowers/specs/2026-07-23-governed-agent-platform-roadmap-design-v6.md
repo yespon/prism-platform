@@ -44,7 +44,7 @@ To prevent scope creep, these are explicitly out of scope for all versions:
 
 v1.1 completed the "de-ops" transition. v1.2 extracts the Agent Loop as a standalone primitive — the first step toward v2.0's autonomous runtime. v1.3 builds the workflow engine. v1.4 introduces the compliance layer. v1.5 delivers the digital employee framework and extension system. v1.6 adds the data connector layer. v1.7 adds enterprise security, session DAG, and multi-run modes. v1.8 establishes context engineering. v1.9 adds evaluation, SRE governance, and feedback loops. v2.0 achieves architectural independence with identity mesh and federation.
 
-**Key change from v5**: Overloaded versions (v1.2 with 9 P0s, v1.4 with 9 P0s, v1.6 with 10 P0s) have been split into focused, deliverable increments. Each version now targets 3-7 P0 items.
+**Key change from v5**: Overloaded versions (v1.2 with 9 P0s, v1.4 with 9 P0s, v1.6 with 10 P0s) have been split into focused, deliverable increments. Each version now targets 3-8 P0 items.
 
 ### 1.5 Version Cadence Assumptions
 
@@ -827,7 +827,6 @@ v1.3 → v1.4: Policy Engine deployed as builtin (always on).
               agt verify shows policy coverage gaps. No breaking change.
 
 v1.4 → v1.5: Custom Agent upgraded to "full framework".
-              DeerFlow loop removed; only Agent Loop remains (v1.2 Agent Loop is now the sole execution engine).
               Extension system: Builtin SPIs + Extension SPIs + Event Hooks + Skills (lazy) + Templates.
               Skills: existing preload by default, new lazy by default.
               Cross-skill reference detection warns before lazy-loading.
@@ -839,7 +838,8 @@ v1.5 → v1.6: Data Connector SPI + PG connector + Document Ingestion + RAG pipe
               Vector store infrastructure added (pgvector default).
               AI Analysis Workbench enabled per-tenant (if P1 delivered).
 
-v1.6 → v1.7: Session DAG is additive (linear sessions migrate as single-branch DAG).
+v1.6 → v1.7: DeerFlow loop removed; only Agent Loop remains (v1.2 Agent Loop is now the sole execution engine).
+              Session DAG is additive (linear sessions migrate as single-branch DAG).
               DAG storage is persistent — branches survive process restart.
               Multi-run modes are additive (web UI still primary).
               Open API + runtime security disabled by default.
