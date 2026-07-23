@@ -24,7 +24,7 @@
 | **Harness over Model** | Engineering around the model (tools, context, memory, evaluation, governance) outlasts any single model generation. The harness is the moat. |
 | **Defense in Depth** | Perimeter security (RBAC, audit) + Compliance (policy engine, OWASP) + Runtime security (sandbox, capability tokens). No single layer is sufficient. |
 | **Governance as Foundation, Extension as Superstructure** | Policy Engine is the foundation (like an OS kernel) — builtin, always-on, non-optional. Extension SPIs are the superstructure (like user-space programs) — optional, configurable, distributable. Governance is the ground the platform stands on; everything else is built on top. This resolves the tension between "minimal core" and "always-on governance": the core is minimal in its *extension* surface, not in its *governance* surface. |
-| **Layered Independence** | Each architectural layer is independently usable. The Agent Loop can be used standalone (SDK mode). Policy Engine is embedded in the Agent Loop at SDK level, and gateway-level at platform level. Governance is everywhere; the deployment topology varies. |
+| **Layered Independence** | Each architectural layer is independently usable. In v2.0+, the Agent Loop can be used standalone (SDK mode) after LangGraph is replaced. In v1.2–v1.7, the Agent Loop is a decoupling abstraction over LangGraph — usable via SDK but not yet independent of LangGraph. Policy Engine is embedded in the Agent Loop at SDK level, and gateway-level at platform level. Governance is everywhere; the deployment topology varies. |
 | **Open Evolution** | From single-organization governance to cross-organization federation. Governance capabilities should be open-sourced to build community trust and set standards. |
 
 ### 1.3 Explicit Non-Goals
@@ -100,7 +100,7 @@ The governance and agent platform space is evolving rapidly. This analysis frame
 |--------|----------|------------------|
 | **Governance standardization** | Microsoft AGT (v4.1, 45→5 packages) is converging the governance toolkit space. If we wait until v2.0 to open-source, AGT may be the de facto standard. | Consider pulling Open Governance Toolkit forward to v1.4 (Policy Engine release) — but this conflicts with v1.4's focused scope. Decision deferred to v1.4 planning. |
 | **DeerFlow upstream** | DeerFlow is ByteDance's project; its evolution is not under our control. If DeerFlow stops maintenance or pivots, v1.2–v1.7 are affected. | Agent Loop extraction (v1.2) is itself the hedge — the earlier we decouple, the lower the upstream risk. |
-| **Agent platform consolidation** | LangChain, CrewAI, AutoGen, Google ADK are competing. By v2.0 (22+ months), the field may have consolidated. | Our differentiation is *governance* (deterministic, not probabilistic) and *self-hosted enterprise*. Neither is well-served by current competitors. |
+| **Agent platform consolidation** | LangChain, CrewAI, AutoGen, Google ADK are competing. By v1.7 (~15-18 months, DeerFlow removed) and v2.0 (~22+ months, full independence), the field may have consolidated. | Our differentiation is *governance* (deterministic, not probabilistic) and *self-hosted enterprise*. Neither is well-served by current competitors. v1.7 is the first major architecture milestone; v2.0 is full independence. |
 | **Single-user vs enterprise** | Pi-Agent (64K stars) proved single-user demand. Enterprise agent platforms are underserved. | Our enterprise + governance positioning avoids direct competition with single-user tools. |
 
 **Risk**: If the field consolidates before v2.0, federation (v2.0) may be solving a problem that standardization has already addressed. Monitor and adjust.
@@ -548,7 +548,8 @@ v1.7 upgrade:
 | **P1** | Cross-Session Continuity | "Continue from last conversation" — context inheritance with decay |
 | **P1** | Retrieval Formatting | Structured results → Markdown table / JSON / natural language, configurable formatting |
 | **P1** | Prompt Template A/B Branching | Compare prompt variants, data-driven selection |
-| **P1** | Summarization & Semantic Pruning | Advanced compression algorithms requiring additional LLM calls. Sliding window compression is P0. |
+
+*(Note: Summarization and semantic pruning are P1 algorithms within the Context Compression Engine P0 above, not separate items.)*
 
 ### v1.9 — Observability, SRE Governance & Evaluation
 
@@ -633,8 +634,8 @@ Each component is an independent repository, usable standalone or together. The 
 ```
 v1.2: Agent Loop extracted (parallel to DeerFlow, feature-flag toggle)
 v1.3: Agent Loop becomes default; DeerFlow loop marked deprecated
+v1.4: Policy Engine independent (abstraction layer decoupled from DeerFlow internals)
 v1.7: DeerFlow loop removed; only Agent Loop remains
-v1.4: Policy Engine independent
 v2.0: LangGraph orchestration replaced (last DeerFlow component)
       → DeerFlow dependency fully removed
 ```
