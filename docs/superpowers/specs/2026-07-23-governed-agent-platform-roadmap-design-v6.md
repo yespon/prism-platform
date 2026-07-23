@@ -141,7 +141,7 @@ Each version lists capabilities with priority tags:
 |----------|-------|---------|
 | **P0** | **Agent Loop Primitive** | **Extract Agent Loop abstraction layer over LangGraph, decoupling platform code from LangGraph-specific APIs. Runs in parallel with existing DeerFlow loop via feature flag. Note: v1.2 is decoupling, not replacement — LangGraph is still the underlying runtime. v2.0 replaces LangGraph entirely.** |
 | **P0** | **Tool Registry** | **Unified tool definition schema (JSON Schema validation), tool discovery API, tool lifecycle (register/discover/deprecate).** |
-| **P0** | **Message System** | **Conversation history representation and passing. Multi-turn state machine. Independent of any specific Agent implementation.** |
+| **P0** | **Message System** | **Conversation history representation and passing. Multi-turn state machine. Interface is implementation-agnostic; in v1.2–v1.7 the implementation still adapts to LangGraph's message model. Truly independent at v2.0.** |
 | **P1** | Executor Interface | Agent dialogue / Code sandbox / HTTP call / Terminal (plugin executor). Basic interface definition; full implementation in v1.3. |
 
 **Agent Loop Primitive — Architecture:**
@@ -609,7 +609,7 @@ v1.7 upgrade:
 
 | Priority | Scope | Content |
 |----------|-------|---------|
-| **P0** | Autonomous Agent Runtime | Replace DeerFlow dependency entirely. Agent Loop (v1.2), Tool Registry (v1.2), Message System (v1.2), Policy Engine (v1.4) are already independent. Only LangGraph orchestration remains to be replaced. |
+| **P0** | Autonomous Agent Runtime | Replace DeerFlow dependency entirely. Agent Loop (v1.2), Tool Registry (v1.2), Message System (v1.2), Policy Engine (v1.4) are already decoupled from DeerFlow internals via abstraction layers. Only LangGraph orchestration remains to be replaced to achieve full independence. |
 | **P0** | **Identity Mesh** | **SPIFFE/DID/mTLS credentials for every agent. Trust scoring and delegation chain management. "Which agent did this?" answered with cryptographic certainty.** |
 | **P0** | **Open Governance Toolkit** | **Policy Engine, RBAC, Audit, and Cost Attribution released as standalone open-source libraries (Apache 2.0). Independent repositories. Platform team maintains.** |
 | **P1** | Central Skill Registry | Cross-tenant/cross-organization skill sharing and trading (npm-like, enterprise-grade permissions) |
@@ -890,8 +890,8 @@ v1.8 → v1.9: Observability data auto-collected.
               SLO, chaos testing, kill switch (per-agent), circuit breaker (SLO-driven) enabled per-tenant.
               Historical data not backfilled.
 
-v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already independent from v1.2–v1.4.
-              Only LangGraph orchestration remains to be replaced.
+v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already decoupled from DeerFlow internals from v1.2–v1.4.
+              Only LangGraph orchestration remains to be replaced (the sole remaining DeerFlow dependency).
               Grayscale migration. Identity mesh is additive.
               Open Governance Toolkit released as 4 separate Apache 2.0 repos.
 ```
@@ -901,7 +901,7 @@ v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already 
 | Version | Technical | Performance | Community |
 |---------|-----------|-------------|-----------|
 | v1.1 | Plugin toggle test pass rate 100%; README narrative published | Plugin toggle latency <10ms | — |
-| v1.2 | Agent Loop operates independently of DeerFlow; comparison tests pass | Agent Loop latency parity with DeerFlow (±5%) | First external contributor PR merged |
+| v1.2 | Agent Loop operates as abstraction layer over DeerFlow/LangGraph (decoupled, not independent); comparison tests pass | Agent Loop latency parity with DeerFlow (±5%) | First external contributor PR merged |
 | v1.3 | 5 workflow templates; 1000 concurrent workflows; Saga idempotent retry + selective compensation verified; kill switch stops workflows within 5s | Workflow step transition <100ms | — |
 | v1.4 | OWASP Top 10 compliance coverage 100%; tamper-evident audit verified | Policy evaluation <1ms per tool call | — |
 | v1.5 | 20+ skills in official library; 5 extension levers operational; trust scoring visible (if P1 delivered) | Skill lazy-load <500ms | Monthly active tenants > baseline |
