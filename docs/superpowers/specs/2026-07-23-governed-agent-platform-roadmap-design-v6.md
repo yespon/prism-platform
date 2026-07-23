@@ -434,6 +434,7 @@ v1.5 upgrade:
 | **P0** | **Declarative Agent Config** | **Agent as Code (YAML/JSON), GitOps-friendly, version-controlled** |
 | **P0** | **Session DAG** | **Tree/DAG-structured conversation sessions. Fork at any point, explore alternative branches, merge or discard. Includes persistent DAG storage — sessions survive process restart.** |
 | **P0** | **Multi-Run Modes** | **Interactive (UI), Batch/CI (print/JSON), RPC (cross-process), SDK (embedded). Agent Loop is callable from any mode.** |
+| **P0** | **DeerFlow Loop Removal** | **Remove DeerFlow's legacy LangGraph loop. Agent Loop (v1.2) is now the sole execution engine. Existing Skill/Agent compatibility verified through comparison test suite.** |
 | **P1** | Multi-Model Routing | Auto-select model by task type/cost/latency |
 | **P1** | **Tool Marketplace** | **Tool discovery, distribution, versioning. Tools are platform assets, not per-agent code. Distinct from v1.2 Tool Registry (which handles registration/validation).** |
 
@@ -596,7 +597,7 @@ Each component is an independent repository, usable standalone or together. The 
 ```
 v1.2: Agent Loop extracted (parallel to DeerFlow, feature-flag toggle)
 v1.3: Agent Loop becomes default; DeerFlow loop marked deprecated
-v1.5: DeerFlow loop removed; only Agent Loop remains
+v1.7: DeerFlow loop removed; only Agent Loop remains
 v1.4: Policy Engine independent
 v2.0: LangGraph orchestration replaced (last DeerFlow component)
       → DeerFlow dependency fully removed
@@ -766,7 +767,7 @@ REST/GraphQL APIs →  │ API Connector            │
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Agent Loop extraction | Standalone module in v1.2, default in v1.3, DeerFlow loop removed in v1.5 | Gradual replacement with automated comparison testing |
+| Agent Loop extraction | Standalone module in v1.2, default in v1.3, DeerFlow loop removed in v1.7 | Gradual replacement with automated comparison testing |
 | Workflow engine | Self-developed DAG + Saga; Agent Loop as execution unit | Keep orchestration controllable; Agent Loop is independent of Workflow |
 | Agent Loop vs Workflow | Coexistence, not competition | Agent = "employee", Workflow = "project manager" |
 | Governance model | Three-layer: Perimeter (v1.0) + Compliance (v1.4) + Runtime (v1.7) | Defense in depth; NVIDIA + Microsoft AGT |
@@ -796,7 +797,7 @@ REST/GraphQL APIs →  │ API Connector            │
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Agent Loop extraction breaks DeerFlow integration | Agent execution fails during transition | Parallel run with feature-flag toggle; automated comparison testing; v1.3 Agent Loop becomes default; v1.5 DeerFlow loop removed |
+| Agent Loop extraction breaks DeerFlow integration | Agent execution fails during transition | Parallel run with feature-flag toggle; automated comparison testing; v1.3 Agent Loop becomes default; v1.7 DeerFlow loop removed |
 | Policy engine performance overhead | Tool-call latency increase | Deterministic (no LLM call); target <1ms overhead; Rust core option for hot path |
 | Extension system complexity | Five levers may overwhelm users | Each lever independently usable; start with Plugins + Skills (v1.1/v1.5), add Hooks incrementally |
 | Workflow engine and Agent Loop state inconsistency | Agent executing when Workflow restarts | Workflow only stores "invocation handle"; Agent Loop state managed independently; Saga compensates |
@@ -836,6 +837,7 @@ v1.4 → v1.5: Custom Agent upgraded to "full framework".
 v1.5 → v1.6: Data Connector SPI + PG connector + Document Ingestion + RAG pipeline.
               Additional connectors (MySQL, ClickHouse, etc.) ship as subsequent Extension SPIs.
               Vector store infrastructure added (pgvector default).
+              AI Analysis Workbench enabled per-tenant (if P1 delivered).
 
 v1.6 → v1.7: Session DAG is additive (linear sessions migrate as single-branch DAG).
               DAG storage is persistent — branches survive process restart.
@@ -864,10 +866,10 @@ v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already 
 | v1.2 | Agent Loop operates independently of DeerFlow; comparison tests pass | Agent Loop latency parity with DeerFlow (±5%) | First external contributor PR merged |
 | v1.3 | 5 workflow templates; 1000 concurrent workflows; Saga rollback verified; kill switch stops workflows within 5s | Workflow step transition <100ms | — |
 | v1.4 | OWASP Top 10 compliance coverage 100%; tamper-evident audit verified | Policy evaluation <1ms per tool call | — |
-| v1.5 | 20+ skills in official library; 5 extension levers operational; trust scoring visible | Skill lazy-load <500ms | Monthly active tenants > baseline |
+| v1.5 | 20+ skills in official library; 5 extension levers operational; trust scoring visible (if P1 delivered) | Skill lazy-load <500ms | Monthly active tenants > baseline |
 | v1.6 | PG connector operational; RAG pipeline with hybrid search + reranking | RAG retrieval <2s p95 | — |
 | v1.7 | Session DAG operational (fork/resume/compare); 4 run modes operational; ≥1 IM integration launched; runtime security policies enforceable | DAG fork <100ms; capability token issuance <50ms | — |
-| v1.8 | 3 compression strategies operational; token budget monitor real-time | Compression <500ms per trigger; token count accuracy 99% | — |
+| v1.8 | ≥1 compression strategy (sliding window) operational; token budget monitor real-time | Compression <500ms per trigger; token count accuracy 99% | — |
 | v1.9 | Cost attribution accuracy 95%+; SLO definition operational; chaos testing 10+ failure modes | Evaluation pipeline <5min per test suite | NPS > baseline |
 | v2.0 | Federation verified across 2 independent instances; identity mesh operational; DeerFlow fully replaced | Migration downtime <5min per tenant | Open governance toolkit has ≥3 external contributors |
 
