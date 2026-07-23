@@ -156,7 +156,10 @@ v1.2 deployment:
   ├─ Agent Loop runs alongside DeerFlow's existing LangGraph loop
   ├─ Feature flag: OPSINTECH_AGENT_LOOP=new|legacy (default: legacy)
   ├─ Both loops share the same Tool Registry and Message System
-  ├─ Automated comparison tests: same input → both loops → compare outputs
+  ├─ Automated comparison tests:
+  │   ├─ Tool-call sequence match rate (allows order differences, target ≥90%)
+  │   ├─ Final result success rate (human-evaluated sample, target: no statistically significant difference)
+  │   └─ Latency distribution (p50/p95 comparison, target: Agent Loop within ±10% of DeerFlow)
   └─ Telemetry: track latency, success rate, divergence rate for both loops
 ```
 
@@ -165,7 +168,7 @@ v1.2 deployment:
 ```
 v1.2: Agent Loop extracted (parallel to DeerFlow, feature-flag toggle)
 v1.3: Agent Loop becomes default; DeerFlow loop marked deprecated
-v1.5: DeerFlow loop removed; only Agent Loop remains
+v1.7: DeerFlow loop removed; only Agent Loop remains
 v2.0: LangGraph orchestration replaced; DeerFlow dependency fully removed
 ```
 
@@ -254,8 +257,8 @@ v1.3 → v1.4 upgrade:
 | Mode | Description | When to use |
 |------|-------------|-------------|
 | **Platform embedded** | Policy Engine runs in the Compliance Layer of the platform. All tool calls pass through the gateway. | Normal platform deployment |
-| **SDK embedded** | Policy Engine compiled into the Agent Loop SDK. Zero network dependency, YAML policies loaded from local filesystem. | SDK mode (v1.7), edge deployment (v2.0) |
-| **SDK remote** | SDK calls platform Policy Engine API. Lighter SDK footprint, but requires network connectivity. | Lightweight SDK integrations |
+
+SDK deployment modes (Embedded / Remote) are defined in v1.7 when the SDK is introduced.
 
 ### v1.5 — Digital Employee Framework + Extension System
 
@@ -296,6 +299,36 @@ v1.3 → v1.4 upgrade:
 v1.5 delivers the complete Prompt Template system — variable injection, version management, per-tenant defaults, slash-command loading, reusable markdown templates. This is NOT fragmented across versions. v1.8 adds only A/B branching as a P1 enhancement.
 
 **Event Hooks vs Policy Engine — execution order:**
+
+v1.4 (before Event Hooks):
+
+```
+Agent Intent → Tool Call Request
+                    │
+                    ▼
+            ┌──────────────┐
+            │ Policy Engine │  ← Deterministic YAML evaluation (v1.4, builtin)
+            │ (always on,   │     FINAL authority: allow / deny / require_approval
+            │  can veto)    │
+            └──────┬───────┘
+                   │
+        ┌──────────┼──────────┐
+        ▼          ▼          ▼
+     Allow      Deny       Require Approval
+        │          │          │
+        ▼          ▼          ▼
+   Execute    Raise        Queue for
+   Tool       Governance   Human
+              Denied       Approval
+                   │
+                   ▼
+            ┌──────────────┐
+            │ Audit Log     │  ← Merkle-tree, tamper-evident
+            │ Decision BOM  │
+            └──────────────┘
+```
+
+v1.5+ (with Event Hooks wrapping Policy Engine):
 
 ```
 Agent Intent → Tool Call Request
@@ -471,13 +504,14 @@ v1.7 upgrade:
 
 | Priority | Scope | Content |
 |----------|-------|---------|
-| **P0** | **Context Compression Engine** | **Pluggable compression algorithms: summarization, sliding window, semantic pruning. Configurable per agent. Auto-trigger on token threshold.** |
+| **P0** | **Context Compression Engine** | **Pluggable compression algorithms. Sliding window (P0, simplest), summarization (P1), semantic pruning (P1). Configurable per agent. Auto-trigger on token threshold. ⚠️ High technical risk — compression quality directly impacts agent output quality.** |
 | **P0** | **Token Budget Monitor** | **Current consumption, remaining budget, projected exhaustion. Real-time visualization. Auto-trigger compression when approaching limit.** |
 | **P0** | Memory Strategy | Short-term (session), long-term (persistent), semantic (vector retrieval) — configurable per agent |
 | **P0** | Context Window Management | Token budget visualization, overflow warnings, automatic truncation |
 | **P1** | Cross-Session Continuity | "Continue from last conversation" — context inheritance with decay |
 | **P1** | Retrieval Formatting | Structured results → Markdown table / JSON / natural language, configurable formatting |
 | **P1** | Prompt Template A/B Branching | Compare prompt variants, data-driven selection |
+| **P1** | Summarization & Semantic Pruning | Advanced compression algorithms requiring additional LLM calls. Sliding window compression is P0. |
 
 ### v1.9 — Observability, SRE Governance & Evaluation
 
@@ -528,7 +562,7 @@ v1.7 upgrade:
 │  └─ Circuit breaker (SLO-driven, extends v1.3)│
 │                                              │
 │  Data Flywheel                               │
-│  Feedback → Samples → Retrain/Refine → Deploy│
+│  Feedback → Samples → Refine → Deploy        │
 └──────────────────────────────────────────────┘
 ```
 
@@ -607,7 +641,7 @@ Version annotations `[vX.Y]` indicate when each module is introduced. Unmarked m
 ├──────────────────────────────────────────────────────────┤
 │  Governance Layer │ RBAC │ Audit │ Cost │ Quota          │
 ├──────────────────────────────────────────────────────────┤
-│  Infrastructure   │ DB │ Sandbox │ Storage │ MCP │ Vector│
+│  Infrastructure   │ DB │ Sandbox │ Storage │ MCP │ Vector [v1.6]│
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -792,6 +826,7 @@ v1.3 → v1.4: Policy Engine deployed as builtin (always on).
               agt verify shows policy coverage gaps. No breaking change.
 
 v1.4 → v1.5: Custom Agent upgraded to "full framework".
+              DeerFlow loop removed; only Agent Loop remains (v1.2 Agent Loop is now the sole execution engine).
               Extension system: Builtin SPIs + Extension SPIs + Event Hooks + Skills (lazy) + Templates.
               Skills: existing preload by default, new lazy by default.
               Cross-skill reference detection warns before lazy-loading.
@@ -800,7 +835,7 @@ v1.4 → v1.5: Custom Agent upgraded to "full framework".
 
 v1.5 → v1.6: Data Connector SPI + PG connector + Document Ingestion + RAG pipeline.
               Additional connectors (MySQL, ClickHouse, etc.) ship as subsequent Extension SPIs.
-              AI Analysis Workbench enabled per-tenant.
+              Vector store infrastructure added (pgvector default).
 
 v1.6 → v1.7: Session DAG is additive (linear sessions migrate as single-branch DAG).
               DAG storage is persistent — branches survive process restart.
@@ -866,7 +901,7 @@ v1.x → v2.0: Agent Loop, Tool Registry, Message System, Policy Engine already 
 | **Context Engineering** | The systematic design and management of what goes into an Agent's context window — templates, compression, retrieval, memory |
 | **Harness** | The engineering layer around the model: tools, context, memory, evaluation, governance. The platform's core competency beyond model selection. |
 | **A2A** | Agent-to-Agent protocol — standardized discovery, capability advertisement, and invocation between Agents |
-| **Data Flywheel** | Feedback → sample collection → retraining/refinement → redeployment → more feedback |
+| **Data Flywheel** | Feedback → sample collection → prompt/model refinement → redeployment → more feedback |
 | **Policy as Code** | Declarative YAML policies defining agent behavior boundaries; version-controlled, reviewable, GitOps-friendly |
 | **Decision BOM** | Bill of Materials for every governance decision: active policy, agent request, allow/deny reason — cryptographically verifiable |
 | **Saga** | Distributed transaction pattern: each step has a compensating action; failures trigger rollback of completed steps |
