@@ -194,7 +194,7 @@ v2.0: LangGraph orchestration replaced; DeerFlow dependency fully removed
 | Role | "Employee" — single Agent's brain | "Project Manager" — cross-system orchestration |
 | Duration | Minutes to hours | Hours to days |
 | State | In-memory (checkpoint) | Database persistent, recoverable |
-| Human Intervention | In-conversation (v1.5+) | Async approval nodes, suspend/resume |
+| Human Intervention | In-conversation (v1.7+) | Async approval nodes, suspend/resume |
 | Cross-System | None | Saga pattern, compensating rollback |
 | Failure Recovery | Restart = lost context | Resume from database state |
 | Audit | Single conversation | Full-chain, replayable |
@@ -423,7 +423,7 @@ v1.5 upgrade:
 
 ### v1.7 — Enterprise Security, Session DAG & Multi-Run Modes
 
-**Focus**: Enterprise-grade security, non-linear conversations, and platform integration points.
+**Focus**: Enterprise-grade security, non-linear conversations, platform integration points, and DeerFlow runtime removal.
 
 | Priority | Scope | Content |
 |----------|-------|---------|
