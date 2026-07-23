@@ -23,6 +23,7 @@
 | **Context Engineering** | Context determines agent capability ceiling. Prompt templates, compression, window management, and retrieval strategies are platform-level concerns. |
 | **Harness over Model** | Engineering around the model (tools, context, memory, evaluation, governance) outlasts any single model generation. The harness is the moat. |
 | **Defense in Depth** | Perimeter security (RBAC, audit) + Compliance (policy engine, OWASP) + Runtime security (sandbox, capability tokens). No single layer is sufficient. |
+| **Governance as Foundation, Extension as Superstructure** | Policy Engine is the foundation (like an OS kernel) — builtin, always-on, non-optional. Extension SPIs are the superstructure (like user-space programs) — optional, configurable, distributable. Governance is the ground the platform stands on; everything else is built on top. This resolves the tension between "minimal core" and "always-on governance": the core is minimal in its *extension* surface, not in its *governance* surface. |
 | **Layered Independence** | Each architectural layer is independently usable. The Agent Loop can be used standalone (SDK mode). Policy Engine is embedded in the Agent Loop at SDK level, and gateway-level at platform level. Governance is everywhere; the deployment topology varies. |
 | **Open Evolution** | From single-organization governance to cross-organization federation. Governance capabilities should be open-sourced to build community trust and set standards. |
 
@@ -76,6 +77,34 @@ These are planning assumptions, not commitments. Actual velocity depends on team
 | AI Agent Book (bojieli) | Agent = LLM + Context + Tools; Harness engineering is core competency | v1.8 context engineering |
 | Alibaba Cloud 2025 AI Architecture | Evaluation as full-lifecycle capability; data flywheel | v1.9 evaluation framework |
 
+### 1.7 Business Model & Sustainability
+
+A 22-31 month roadmap requires a sustainability model. The platform is self-hosted open source; revenue comes from three streams, not from hosting:
+
+| Stream | Description | Target Version |
+|--------|-------------|----------------|
+| **Open Source Core** | Full platform (v1.0–v2.0) is Apache 2.0 / MIT. No feature gates. Self-hostable at no cost. | All versions |
+| **Enterprise Edition** | Advanced features for enterprise: Edge Deployment (v2.0 P1), Agent Federation (v2.0 P1), Identity Mesh (v2.0), SSO/LDAP (v1.7). Released as open source but with commercial support contracts. | v1.7+ |
+| **Governance Toolkit Commercial Support** | The 4 Open Governance libraries (v2.0) are Apache 2.0. Commercial offering: SLA-backed support, custom policy packs, integration consulting. | v2.0 |
+| **Hosted Option (future, not committed)** | If demand emerges post-v2.0, a managed hosted version may be considered. Not in current roadmap. | Post-v2.0 |
+
+**Principle**: The open source core is never feature-gated. Enterprise value is in support, advanced deployment topologies, and consulting — not in withholding features. This aligns with Microsoft AGT's open governance approach and Pi-Agent's fully-open model.
+
+**Sustainability assumption**: The platform is maintained by the author + community contributors during v1.x. Commercial revenue is expected to begin with v1.7 (Enterprise Edition features). If commercial traction is insufficient by v1.9, v2.0 scope will be reduced to match available resources.
+
+### 1.8 Market Window Analysis
+
+The governance and agent platform space is evolving rapidly. This analysis frames the competitive window:
+
+| Window | Analysis | Roadmap Response |
+|--------|----------|------------------|
+| **Governance standardization** | Microsoft AGT (v4.1, 45→5 packages) is converging the governance toolkit space. If we wait until v2.0 to open-source, AGT may be the de facto standard. | Consider pulling Open Governance Toolkit forward to v1.4 (Policy Engine release) — but this conflicts with v1.4's focused scope. Decision deferred to v1.4 planning. |
+| **DeerFlow upstream** | DeerFlow is ByteDance's project; its evolution is not under our control. If DeerFlow stops maintenance or pivots, v1.2–v1.7 are affected. | Agent Loop extraction (v1.2) is itself the hedge — the earlier we decouple, the lower the upstream risk. |
+| **Agent platform consolidation** | LangChain, CrewAI, AutoGen, Google ADK are competing. By v2.0 (22+ months), the field may have consolidated. | Our differentiation is *governance* (deterministic, not probabilistic) and *self-hosted enterprise*. Neither is well-served by current competitors. |
+| **Single-user vs enterprise** | Pi-Agent (64K stars) proved single-user demand. Enterprise agent platforms are underserved. | Our enterprise + governance positioning avoids direct competition with single-user tools. |
+
+**Risk**: If the field consolidates before v2.0, federation (v2.0) may be solving a problem that standardization has already addressed. Monitor and adjust.
+
 ---
 
 ## 2. Version Planning
@@ -110,7 +139,7 @@ Each version lists capabilities with priority tags:
 
 | Priority | Scope | Content |
 |----------|-------|---------|
-| **P0** | **Agent Loop Primitive** | **Extract think→act→observe→think loop from DeerFlow as standalone reusable module. Independent of LangGraph orchestration. Runs in parallel with existing DeerFlow loop via feature flag.** |
+| **P0** | **Agent Loop Primitive** | **Extract Agent Loop abstraction layer over LangGraph, decoupling platform code from LangGraph-specific APIs. Runs in parallel with existing DeerFlow loop via feature flag. Note: v1.2 is decoupling, not replacement — LangGraph is still the underlying runtime. v2.0 replaces LangGraph entirely.** |
 | **P0** | **Tool Registry** | **Unified tool definition schema (JSON Schema validation), tool discovery API, tool lifecycle (register/discover/deprecate).** |
 | **P0** | **Message System** | **Conversation history representation and passing. Multi-turn state machine. Independent of any specific Agent implementation.** |
 | **P1** | Executor Interface | Agent dialogue / Code sandbox / HTTP call / Terminal (plugin executor). Basic interface definition; full implementation in v1.3. |
@@ -120,7 +149,8 @@ Each version lists capabilities with priority tags:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                   Agent Loop Engine                      │
-│  (independent of DeerFlow, independent of Workflow)      │
+│  (abstraction layer over LangGraph, decoupling platform  │
+│   code from LangGraph-specific APIs)                     │
 │                                                         │
 │  User Input → ┌──────────┐    ┌──────────┐             │
 │               │  Think   │ → │  Act     │             │
@@ -146,6 +176,12 @@ Each version lists capabilities with priority tags:
 │            │ (Deterministic│   When present: intercept  │
 │            │  intercept)   │   When absent: direct pass │
 │            └──────────────┘                            │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  LangGraph Runtime (DeerFlow's orchestration)    │   │
+│  │  v1.2-v1.7: underlying runtime (via abstraction) │   │
+│  │  v2.0: replaced by autonomous runtime            │   │
+│  └─────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -180,7 +216,7 @@ v2.0: LangGraph orchestration replaced; DeerFlow dependency fully removed
 |----------|-------|---------|
 | **P0** | Event Source Abstraction | Webhook / Scheduled / File change / Message queue |
 | **P0** | Workflow Orchestration | DAG steps, conditional branches, parallel/serial, human approval nodes, retry/timeout |
-| **P0** | **Saga Pattern** | **Compensating rollback, idempotency guarantee, retry with exponential backoff** |
+| **P0** | **Saga Pattern (Idempotent Retry + Selective Compensation)** | **Idempotent retry with exponential backoff for all steps. Selective compensation rollback for steps with reversible side effects (e.g., sent notifications can be revoked; executed SQL cannot be "un-executed"). Note: Agent workflow failure modes differ from microservice transactions — most steps support retry, not compensation.** |
 | **P0** | **Kill Switch (Infrastructure)** | **Emergency stop all in-flight workflows per tenant/workflow level. Foundation for per-agent kill switch in v1.9.** |
 | **P0** | Executor Interface | Full implementation: Agent dialogue / Code sandbox / HTTP call / Terminal (as plugin executor) |
 | **P0** | Audit Closure | Event → Workflow → Execution → Result, full-chain traceable and replayable |
@@ -767,7 +803,7 @@ REST/GraphQL APIs →  │ API Connector            │
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Agent Loop extraction | Standalone module in v1.2, default in v1.3, DeerFlow loop removed in v1.7 | Gradual replacement with automated comparison testing |
+| Agent Loop extraction | v1.2: abstraction layer over LangGraph (decoupling). v1.3: becomes default. v1.7: DeerFlow loop removed. v2.0: LangGraph replaced entirely. | Gradual decoupling→replacement; v1.2 is NOT independence from LangGraph, only decoupling |
 | Workflow engine | Self-developed DAG + Saga; Agent Loop as execution unit | Keep orchestration controllable; Agent Loop is independent of Workflow |
 | Agent Loop vs Workflow | Coexistence, not competition | Agent = "employee", Workflow = "project manager" |
 | Governance model | Three-layer: Perimeter (v1.0) + Compliance (v1.4) + Runtime (v1.7) | Defense in depth; NVIDIA + Microsoft AGT |
@@ -808,6 +844,8 @@ REST/GraphQL APIs →  │ API Connector            │
 | Compliance rule maintenance | OWASP Top 10 evolves | Community-contributed rule packs; policy lint; versioned rule sets |
 | Federated ecosystem trust model | v2.0 delayed | v1.7 first implement "cross-tenant" federation; v2.0 extend to "cross-platform" via identity mesh |
 | Autonomous runtime replacement | Existing Skill/Agent incompatible | API compatibility layer; migration tools; LTS version maintained in parallel for 6 months |
+| **DeerFlow upstream maintenance risk** | DeerFlow (ByteDance) stops maintenance or pivots; v1.2–v1.7 depend on it | Agent Loop abstraction (v1.2) decouples platform code from DeerFlow internals; earlier extraction = lower risk; v2.0 fully removes dependency |
+| **Vector store scalability wall** | pgvector performance degrades at >10M vectors; users hit a wall after v1.6 deployment | v1.6 ships pgvector only; document the scalability ceiling; Milvus/Qdrant support as P1 in v1.6+ minor release; migration path documented |
 
 ### 4.2 Migration Path
 
